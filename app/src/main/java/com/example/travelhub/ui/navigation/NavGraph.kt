@@ -1,0 +1,55 @@
+package com.example.travelhub.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.travelhub.features.auth.LoginScreen
+import com.example.travelhub.features.auth.RegisterScreen
+import com.example.travelhub.features.main.MainScreen
+import com.example.travelhub.features.profile.EditProfileScreen
+import com.example.travelhub.features.travelpath.TravelPathPreferencesScreen
+
+@Composable
+fun NavGraph() {
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = "login"
+    ) {
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = { navController.navigate("home") },
+                onNavigateToRegister = { navController.navigate("register") },
+                onAnonymousClick = { navController.navigate("home") }
+            )
+        }
+
+        composable("register") {
+            RegisterScreen(
+                onRegisterSuccess = { navController.navigate("login") },
+                onBackToLogin = { navController.popBackStack() }
+            )
+        }
+
+        composable("home") {
+            MainScreen(navController = navController)
+        }
+
+        composable("travel_preferences") {
+            TravelPathPreferencesScreen(
+                onBackClick = { navController.popBackStack() },
+                onGenerateClick = { navController.popBackStack() }
+            )
+        }
+
+        // --- NOUVELLE ROUTE POUR L'ÉDITION DU PROFIL ---
+        composable("edit_profile") {
+            EditProfileScreen(
+                onBackClick = { navController.popBackStack() }, // Ferme via la flèche
+                onSaveClick = { navController.popBackStack() }  // Ferme après la sauvegarde
+            )
+        }
+    }
+}
