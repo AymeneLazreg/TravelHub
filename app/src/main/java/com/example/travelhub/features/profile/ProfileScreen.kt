@@ -19,101 +19,114 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
-fun ProfileScreen(onEditClick: () -> Unit) {
-    // Fausses photos pour le profil utilisateur
-    val userPhotos = (1..12).toList()
+fun ProfileScreen(
+    onEditClick: () -> Unit,
+    profileViewModel: ProfileViewModel = viewModel() // <-- Injection du ViewModel
+) {
+    // On récupère les états du ViewModel
+    val userProfile = profileViewModel.userProfile
+    val isLoading = profileViewModel.isLoading
+
+    val userPhotos = (1..12).toList() // Fausses photos pour la grille
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // --- En-tête du profil ---
-        Column(modifier = Modifier.padding(24.dp)) {
-            // Username et Menu
-            Text(
-                text = "@johndoe",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        if (isLoading) {
+            // Affichage pendant que Firebase cherche les données
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color.Black)
+            }
+        } else {
+            // --- En-tête du profil avec les VRAIES données ---
+            Column(modifier = Modifier.padding(24.dp)) {
 
-            // Ligne : Photo de profil + Stats (Posts, Followers, Following)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Photo
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE0E0E0)),
-                    contentAlignment = Alignment.Center
+                // Le vrai username (en minuscules avec le @)
+                Text(
+                    text = "@${userProfile.username}",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE0E0E0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        ProfileStat(count = "0", label = "Posts")
+                        ProfileStat(count = "0", label = "Followers")
+                        ProfileStat(count = "0", label = "Following")
+                    }
                 }
 
-                // Stats
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    ProfileStat(count = "12", label = "Posts")
-                    ProfileStat(count = "145", label = "Followers")
-                    ProfileStat(count = "89", label = "Following")
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Le vrai prénom et nom
+                Text(text = "${userProfile.prenom} ${userProfile.nom}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+
+                // La bio
+                Text(text = userProfile.bio, fontSize = 14.sp)
+
+                // La localisation
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                    Icon(Icons.Default.LocationOn, contentDescription = "Location", modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = userProfile.location, color = Color.Gray, fontSize = 14.sp)
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = onEditClick,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black)
+                ) {
+                    Text("Modifier le profil", fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
 
-            // Bio et Localisation
-            Text(text = "John Doe", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(text = "Voyageur passionné 🌍📸\nToujours à la recherche du prochain coucher de soleil.", fontSize = 14.sp)
-
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                Icon(Icons.Default.LocationOn, contentDescription = "Location", modifier = Modifier.size(16.dp), tint = Color.Gray)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "Montpellier, France", color = Color.Gray, fontSize = 14.sp)
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Bouton Modifier le profil
-            Button(
-                onClick = onEditClick, // Déclenche la navigation vers l'édition
-                modifier = Modifier.fillMaxWidth().height(40.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black)
+            // --- Grille des photos de l'utilisateur ---
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                contentPadding = PaddingValues(bottom = 90.dp),
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text("Modifier le profil", fontWeight = FontWeight.SemiBold)
-            }
-        }
-
-        HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
-
-        // --- Grille des photos de l'utilisateur ---
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            contentPadding = PaddingValues(bottom = 90.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(userPhotos) { index ->
-                Box(
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .padding(1.dp)
-                        .background(Color(0xFFE0E0E0)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                items(userPhotos) { index ->
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .padding(1.dp)
+                            .background(Color(0xFFE0E0E0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                    }
                 }
             }
         }
     }
 }
 
-// Petit composant pour afficher les statistiques joliment
 @Composable
 fun ProfileStat(count: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
