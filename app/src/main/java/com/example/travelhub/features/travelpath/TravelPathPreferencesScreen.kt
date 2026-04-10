@@ -38,7 +38,7 @@ fun TravelPathPreferencesScreen(
     val activities = listOf("Culture", "Restauration", "Loisirs", "Découverte")
     val selectedActivities = remember { mutableStateListOf("Culture") }
 
-    val effortLevels = listOf("Faible", "Moyen", "Intense")
+    val effortLevels = listOf("Faible", "Moyen", "Intensee")
     var selectedEffort by remember { mutableStateOf("Moyen") }
 
     val weatherSensitivities = listOf("Froid", "Chaleur", "Humidité")
