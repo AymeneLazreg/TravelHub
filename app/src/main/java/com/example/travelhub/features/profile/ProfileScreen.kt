@@ -28,11 +28,10 @@ fun ProfileScreen(
     onEditClick: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel()
 ) {
-    // On récupère les états du ViewModel
     val userProfile = profileViewModel.userProfile
     val isLoading = profileViewModel.isLoading
-
-    val userPhotos = (1..12).toList() // Fausses photos pour la grille
+    // On récupère les vrais posts
+    val userPosts = profileViewModel.userPosts
 
     Column(
         modifier = Modifier
@@ -40,15 +39,11 @@ fun ProfileScreen(
             .background(Color.White)
     ) {
         if (isLoading) {
-            // Affichage pendant que Firebase cherche les données
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color.Black)
             }
         } else {
-            // --- En-tête du profil avec les VRAIES données ---
             Column(modifier = Modifier.padding(24.dp)) {
-
-                // Le vrai username
                 Text(
                     text = "@${userProfile.username}",
                     fontSize = 20.sp,
@@ -61,7 +56,6 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Affichage dynamique de la photo de profil
                     if (userProfile.photoUrl.isNotEmpty()) {
                         AsyncImage(
                             model = userProfile.photoUrl,
@@ -69,10 +63,9 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .size(80.dp)
                                 .clip(CircleShape),
-                            contentScale = ContentScale.Crop // Coupe l'image pour un cercle parfait
+                            contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Placeholder par défaut si pas de photo
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
@@ -84,22 +77,18 @@ fun ProfileScreen(
                         }
                     }
 
-                    // MODIFICATION ICI : On garde Posts et on remplace les abonnés par Favoris
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                        ProfileStat(count = "0", label = "Posts")
+                        // Compteur dynamique basé sur la taille de la liste des posts
+                        ProfileStat(count = userPosts.size.toString(), label = "Posts")
                         ProfileStat(count = "0", label = "Favoris")
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Le vrai prénom et nom
                 Text(text = "${userProfile.prenom} ${userProfile.nom}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-
-                // La bio
                 Text(text = userProfile.bio, fontSize = 14.sp)
 
-                // La localisation
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Icon(Icons.Default.LocationOn, contentDescription = "Location", modifier = Modifier.size(16.dp), tint = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
@@ -120,21 +109,27 @@ fun ProfileScreen(
 
             HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
 
-            // --- Grille des photos de l'utilisateur ---
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(bottom = 90.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(userPhotos) { index ->
-                    Box(
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .padding(1.dp)
-                            .background(Color(0xFFE0E0E0)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+            // --- GRILLE RÉELLE ---
+            if (userPosts.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Aucune publication", color = Color.Gray)
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    contentPadding = PaddingValues(bottom = 90.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(userPosts) { post ->
+                        AsyncImage(
+                            model = post.imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .padding(1.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            contentScale = ContentScale.Crop
+                        )
                     }
                 }
             }
