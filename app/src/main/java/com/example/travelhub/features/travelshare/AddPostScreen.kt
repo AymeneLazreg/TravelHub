@@ -1,6 +1,10 @@
 package com.example.travelhub.features.travelshare
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,39 +16,51 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddPostScreen() {
-    var location by remember { mutableStateOf("France") }
+fun AddPostScreen(
+    onPostSuccess: () -> Unit = {},
+    viewModel: PostViewModel = viewModel()
+) {
+    var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-
-    // Gestion du menu déroulant pour le bouton Publier
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var expandedMenu by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val isUploading by viewModel.isUploading.collectAsState()
 
-    // Les tags de votre maquette
+    // Tags
     val availableTags = listOf("Nature", "Sunset", "Greece", "City", "Museum")
-    val selectedTags = remember { mutableStateListOf("Nature", "Sunset", "Greece") }
+    val selectedTags = remember { mutableStateListOf<String>() }
+
+    // Launcher pour choisir une photo
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> selectedImageUri = uri }
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
             .padding(24.dp)
-            .verticalScroll(rememberScrollState()) // Pour pouvoir faire défiler si le clavier est ouvert
+            .verticalScroll(rememberScrollState())
     ) {
-        // En-tête
         Text(
             text = "Upload a travel moment",
             fontSize = 20.sp,
@@ -52,47 +68,49 @@ fun AddPostScreen() {
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
-        // Zone d'upload d'image (Placeholder fidèle à votre Figma)
+        // Zone d'upload d'image dynamique
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(200.dp)
                 .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
                 .clickable {
-                    Toast.makeText(context, "Ouverture de la galerie photo...", Toast.LENGTH_SHORT).show()
+                    photoPickerLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Add, contentDescription = "Upload", modifier = Modifier.size(48.dp), tint = Color.Gray)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Upload Photo", color = Color.DarkGray, fontWeight = FontWeight.Medium)
+            if (selectedImageUri == null) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(48.dp), tint = Color.Gray)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Upload Photo", color = Color.DarkGray, fontWeight = FontWeight.Medium)
+                }
+            } else {
+                AsyncImage(
+                    model = selectedImageUri,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Champ Localisation (Simulé comme un menu déroulant pour l'instant)
         Text("Location", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = location,
             onValueChange = { location = it },
+            placeholder = { Text("Ex: Paris, France") },
             modifier = Modifier.fillMaxWidth(),
-            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = "Select location") },
             shape = RoundedCornerShape(8.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Champ Description avec l'icône micro
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-        }
-
+        Text("Description", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
@@ -105,7 +123,6 @@ fun AddPostScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Tags avec LazyRow (Correction du crash)
         Text("Tags", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
@@ -117,51 +134,54 @@ fun AddPostScreen() {
                     onClick = {
                         if (selectedTags.contains(tag)) selectedTags.remove(tag) else selectedTags.add(tag)
                     },
-                    label = { Text(tag) },
-                    shape = RoundedCornerShape(16.dp)
+                    label = { Text(tag) }
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Bouton Publier avec menu déroulant
+        // Bouton Publier
         Box(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = { expandedMenu = true }, // Ouvre le sous-menu au clic
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(55.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121))
-            ) {
-                Text("Publish", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            if (isUploading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            } else {
+                Button(
+                    onClick = { expandedMenu = true },
+                    enabled = selectedImageUri != null && description.isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(55.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121))
+                ) {
+                    Text("Publish", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
-            // Le menu déroulant (Public / Groupe)
             DropdownMenu(
                 expanded = expandedMenu,
                 onDismissRequest = { expandedMenu = false },
-                modifier = Modifier.fillMaxWidth(0.8f) // Prend 80% de la largeur
+                modifier = Modifier.fillMaxWidth(0.8f)
             ) {
                 DropdownMenuItem(
                     text = { Text("Publier en public") },
                     onClick = {
                         expandedMenu = false
-                        Toast.makeText(context, "Photo publiée publiquement !", Toast.LENGTH_SHORT).show()
+                        selectedImageUri?.let { uri ->
+                            viewModel.uploadPost(uri, description, location, selectedTags.toList()) {
+                                Toast.makeText(context, "Post publié !", Toast.LENGTH_LONG).show()
+                                onPostSuccess()
+                            }
+                        }
                     }
                 )
                 DropdownMenuItem(
-                    text = { Text("Publier dans un groupe") },
-                    onClick = {
-                        expandedMenu = false
-                        Toast.makeText(context, "Choix du groupe à venir...", Toast.LENGTH_SHORT).show()
-                    }
+                    text = { Text("Publier dans un groupe (Bientôt)") },
+                    onClick = { expandedMenu = false }
                 )
             }
         }
-
-        // Espace supplémentaire pour la BottomBar
         Spacer(modifier = Modifier.height(80.dp))
     }
 }
