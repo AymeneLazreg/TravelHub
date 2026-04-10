@@ -64,5 +64,5 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")       // Pour la connexion/inscription
     implementation("com.google.firebase:firebase-firestore")  // Pour la base de données (posts, itinéraires)
     implementation("com.google.firebase:firebase-storage")    // Pour stocker les photos
-
+    implementation("io.coil-kt:coil-compose:2.6.0") // Pour afficher les images internet
 }

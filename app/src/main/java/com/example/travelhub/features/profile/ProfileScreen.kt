@@ -16,15 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 
 @Composable
 fun ProfileScreen(
     onEditClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel() // <-- Injection du ViewModel
+    profileViewModel: ProfileViewModel = viewModel()
 ) {
     // On récupère les états du ViewModel
     val userProfile = profileViewModel.userProfile
@@ -46,7 +48,7 @@ fun ProfileScreen(
             // --- En-tête du profil avec les VRAIES données ---
             Column(modifier = Modifier.padding(24.dp)) {
 
-                // Le vrai username (en minuscules avec le @)
+                // Le vrai username
                 Text(
                     text = "@${userProfile.username}",
                     fontSize = 20.sp,
@@ -59,20 +61,33 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFFE0E0E0)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                    // Affichage dynamique de la photo de profil
+                    if (userProfile.photoUrl.isNotEmpty()) {
+                        AsyncImage(
+                            model = userProfile.photoUrl,
+                            contentDescription = "Photo de profil",
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop // Coupe l'image pour un cercle parfait
+                        )
+                    } else {
+                        // Placeholder par défaut si pas de photo
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
+                        }
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    // MODIFICATION ICI : On garde Posts et on remplace les abonnés par Favoris
+                    Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                         ProfileStat(count = "0", label = "Posts")
-                        ProfileStat(count = "0", label = "Followers")
-                        ProfileStat(count = "0", label = "Following")
+                        ProfileStat(count = "0", label = "Favoris")
                     }
                 }
 
