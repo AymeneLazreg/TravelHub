@@ -16,8 +16,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+// VÉRIFIE BIEN CES IMPORTS :
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,13 +46,12 @@ fun AddPostScreen(
     var expandedMenu by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    // Utilisation de collectAsState pour observer le chargement
     val isUploading by viewModel.isUploading.collectAsState()
 
-    // Tags
     val availableTags = listOf("Nature", "Sunset", "Greece", "City", "Museum")
     val selectedTags = remember { mutableStateListOf<String>() }
 
-    // Launcher pour choisir une photo
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> selectedImageUri = uri }
@@ -68,7 +71,6 @@ fun AddPostScreen(
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
-        // Zone d'upload d'image dynamique
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -141,7 +143,6 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Bouton Publier
         Box(modifier = Modifier.fillMaxWidth()) {
             if (isUploading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -175,10 +176,6 @@ fun AddPostScreen(
                             }
                         }
                     }
-                )
-                DropdownMenuItem(
-                    text = { Text("Publier dans un groupe (Bientôt)") },
-                    onClick = { expandedMenu = false }
                 )
             }
         }

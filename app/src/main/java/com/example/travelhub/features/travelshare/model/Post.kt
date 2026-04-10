@@ -2,9 +2,6 @@ package com.example.travelhub.features.travelshare.model
 
 import com.google.firebase.Timestamp
 
-/**
- * Modèle de données représentant une publication de voyage.
- */
 data class Post(
     val id: String = "",
     val userId: String = "",
