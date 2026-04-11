@@ -2,8 +2,10 @@ package com.example.travelhub.features.travelshare.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -44,6 +46,7 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column {
+            // --- HEADER ---
             Row(
                 modifier = Modifier.padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -100,6 +103,7 @@ fun PostItem(
                 }
             }
 
+            // --- IMAGE ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -107,26 +111,53 @@ fun PostItem(
                 contentScale = ContentScale.Crop
             )
 
-            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onLikeClick) {
-                        Icon(
-                            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            tint = if (isLiked) Color.Red else Color.Black
-                        )
-                    }
-                    Text(text = "${post.likesCount}", fontSize = 14.sp, modifier = Modifier.clickable { onShowLikers() })
+            // --- ACTIONS (LIKE & COMMENT) ---
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 1. Bouton Coeur (Action: Like uniquement)
+                IconButton(onClick = onLikeClick) {
+                    Icon(
+                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        tint = if (isLiked) Color.Red else Color.Black
+                    )
                 }
-                Spacer(modifier = Modifier.width(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onCommentClick) {
-                        Icon(imageVector = Icons.Outlined.ModeComment, contentDescription = null, modifier = Modifier.size(22.dp))
-                    }
+
+                // 2. Nombre de Likes (Action: Voir la liste uniquement)
+                // On met un petit padding pour que la zone de clic soit facile à viser
+                Text(
+                    text = "${post.likesCount}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { onShowLikers() }
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                // 3. Section Commentaires (Tout est cliquable ensemble)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onCommentClick() }
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ModeComment,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "${post.comments.size}", fontSize = 14.sp)
                 }
             }
 
+            // --- DESCRIPTION ---
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
                 Text(text = post.description, fontSize = 14.sp)
             }
@@ -134,7 +165,6 @@ fun PostItem(
     }
 }
 
-// FONCTION SORTIE DE LA CLASSE POUR ETRE ACCESSIBLE
 fun getRelativeTime(date: java.util.Date): String {
     val now = java.util.Date().time
     val diff = now - date.time

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelhub.features.profile.UserProfile
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.model.Comment
+import com.example.travelhub.features.travelshare.model.Notification // Ajouté
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -19,6 +20,8 @@ import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.Date
+import android.util.Log
+import kotlinx.coroutines.tasks.await
 
 class PostViewModel : ViewModel() {
 
@@ -87,6 +90,7 @@ class PostViewModel : ViewModel() {
             postRef.update("likesCount", FieldValue.increment(-1L), "likedBy", FieldValue.arrayRemove(currentUser.uid))
         } else {
             postRef.update("likesCount", FieldValue.increment(1L), "likedBy", FieldValue.arrayUnion(currentUser.uid))
+            sendNotification(post, "LIKE") // Ajouté pour le point rouge
         }
     }
 
@@ -100,7 +104,7 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- FAVORIS (SYSTÈME D'ENREGISTREMENT) ---
+    // --- FAVORIS (LA FONCTION QUI MANQUAIT) ---
     fun toggleFavorite(postId: String) {
         val currentUser = auth.currentUser ?: return
         val userRef = firestore.collection("users").document(currentUser.uid)
@@ -108,24 +112,26 @@ class PostViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val snapshot = userRef.get().await()
-                // On récupère la liste actuelle des favoris de l'utilisateur
-                val favorites = snapshot.get("favorites") as? List<String> ?: emptyList()
+                val favorites = (snapshot.get("favorites") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
                 if (favorites.contains(postId)) {
-                    // Si déjà présent, on le retire
                     userRef.update("favorites", FieldValue.arrayRemove(postId)).await()
                 } else {
-                    // Sinon, on l'ajoute
                     userRef.update("favorites", FieldValue.arrayUnion(postId)).await()
+
+                    // Optionnel : notifier l'auteur
+                    val postDoc = firestore.collection("posts").document(postId).get().await()
+                    val post = postDoc.toObject(Post::class.java)
+                    if (post != null) {
+                        sendNotification(post, "FAVORITE")
+                    }
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 
     // --- COMMENTAIRES ---
-    fun addComment(postId: String, text: String) {
+    fun addComment(post: Post, text: String) { // Changé postId par post pour la notif
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             try {
@@ -137,8 +143,10 @@ class PostViewModel : ViewModel() {
                     text = text,
                     timestamp = com.google.firebase.Timestamp.now()
                 )
-                firestore.collection("posts").document(postId)
+                firestore.collection("posts").document(post.id)
                     .update("comments", FieldValue.arrayUnion(newComment)).await()
+
+                sendNotification(post, "COMMENT", text)
             } catch (e: Exception) { e.printStackTrace() }
         }
     }
@@ -185,13 +193,32 @@ class PostViewModel : ViewModel() {
     }
 
     fun deletePost(post: Post) {
+
         viewModelScope.launch {
+
             try {
+
+// Suppression de l'image
+
                 val imageRef = storage.getReferenceFromUrl(post.imageUrl)
+
                 imageRef.delete().await()
+
+
+// Suppression du document
+
                 firestore.collection("posts").document(post.id).delete().await()
-            } catch (e: Exception) { e.printStackTrace() }
+
+                Log.d("PostViewModel", "Post supprimé avec succès")
+
+            } catch (e: Exception) {
+
+                Log.e("PostViewModel", "Erreur suppression: ${e.message}")
+
+            }
+
         }
+
     }
 
     fun reportPost(post: Post) {
@@ -202,6 +229,33 @@ class PostViewModel : ViewModel() {
                 "timestamp" to com.google.firebase.Timestamp.now()
             )
             firestore.collection("reports").add(report)
+        }
+    }
+
+    // --- ENVOI DES NOTIFICATIONS ---
+    private fun sendNotification(post: Post, type: String, commentText: String = "") {
+        val currentUser = auth.currentUser ?: return
+        if (post.userId == currentUser.uid) return
+
+        viewModelScope.launch {
+            try {
+                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
+                val notifId = UUID.randomUUID().toString()
+                val notification = Notification(
+                    id = notifId,
+                    type = type,
+                    fromUserId = currentUser.uid,
+                    fromUsername = userDoc.getString("username") ?: "Aventurier",
+                    fromUserProfileUrl = userDoc.getString("photoUrl") ?: "",
+                    toUserId = post.userId,
+                    postId = post.id,
+                    postImageUrl = post.imageUrl,
+                    commentText = commentText,
+                    timestamp = com.google.firebase.Timestamp.now(),
+                    read = false
+                )
+                firestore.collection("notifications").document(notifId).set(notification)
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 }

@@ -14,24 +14,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelhub.features.travelshare.components.PostItem
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.profile.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: PostViewModel = viewModel(),
-    profileViewModel: ProfileViewModel = viewModel(),
-    onNotificationsClick: () -> Unit // Ajout de la navigation vers les notifications
+    viewModel: PostViewModel,
+    profileViewModel: ProfileViewModel,
+    notificationViewModel: NotificationViewModel,
+    onNotificationsClick: () -> Unit
 ) {
+    // Collecte de l'état des posts
     val posts by viewModel.posts.collectAsState()
     val userProfile = profileViewModel.userProfile
+    val hasUnread = notificationViewModel.hasUnread
 
-    // États pour contrôler l'affichage des fenêtres surgissantes
     var showLikersSheet by remember { mutableStateOf(false) }
     var showCommentsSheet by remember { mutableStateOf(false) }
     var selectedPostId by remember { mutableStateOf<String?>(null) }
@@ -42,7 +44,7 @@ fun HomeScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
 
-                // --- BARRE SUPÉRIEURE (HEADER) ---
+                // --- HEADER ---
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -50,27 +52,33 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "TravelShare",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("TravelShare", fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
-                    // ICÔNE NOTIFICATIONS
                     IconButton(onClick = onNotificationsClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.Notifications,
-                            contentDescription = "Notifications",
-                            modifier = Modifier.size(28.dp),
-                            tint = Color.Black
-                        )
+                        BadgedBox(
+                            badge = {
+                                if (hasUnread) {
+                                    Badge(
+                                        containerColor = Color.Red,
+                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Notifications,
+                                contentDescription = "Notifications",
+                                modifier = Modifier.size(28.dp),
+                                tint = Color.Black
+                            )
+                        }
                     }
                 }
 
+                // --- LISTE DES POSTS ---
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(posts) { post ->
                         val isFavorite = userProfile.favorites.contains(post.id)
-
                         PostItem(
                             post = post,
                             isFavorite = isFavorite,
@@ -83,7 +91,10 @@ fun HomeScreen(
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
                             },
-                            onDeleteClick = { viewModel.deletePost(post) },
+                            onDeleteClick = {
+                                viewModel.deletePost(post) // On utilise directement le 'post' de la liste
+                                profileViewModel.loadUserPosts()
+                            },
                             onReportClick = { viewModel.reportPost(post) },
                             onFavoriteClick = { viewModel.toggleFavorite(post.id) }
                         )
@@ -94,7 +105,7 @@ fun HomeScreen(
         }
     }
 
-    // --- FENÊTRE DES COMMENTAIRES ---
+    // --- BOTTOM SHEETS ---
     if (showCommentsSheet && selectedPost != null) {
         ModalBottomSheet(
             onDismissRequest = { showCommentsSheet = false },
@@ -104,7 +115,6 @@ fun HomeScreen(
         }
     }
 
-    // --- FENÊTRE DES LIKES ---
     if (showLikersSheet) {
         val likers by viewModel.likersDetails.collectAsState()
         ModalBottomSheet(

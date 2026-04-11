@@ -22,7 +22,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.model.Post
@@ -31,18 +30,14 @@ import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 @Composable
 fun ProfileScreen(
     onEditClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel(),
-    postViewModel: PostViewModel = viewModel() // Ajouté pour gérer les actions du PostDetailDialog
+    profileViewModel: ProfileViewModel,
+    postViewModel: PostViewModel
 ) {
+    // On utilise directement les variables du ViewModel pour garantir le temps réel
     val userProfile = profileViewModel.userProfile
     val isLoading = profileViewModel.isLoading
-    val userPosts = profileViewModel.userPosts
-    val favoritePosts = profileViewModel.favoritePosts
 
-    // État pour savoir quel onglet est sélectionné
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-
-    // ÉTAT POUR LE POST SÉLECTIONNÉ (DÉTAIL)
     var selectedPostForDetail by remember { mutableStateOf<Post?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
@@ -51,20 +46,34 @@ fun ProfileScreen(
                 CircularProgressIndicator(color = Color.Black)
             }
         } else {
+            // --- HEADER DU PROFIL ---
             Column(modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
                 Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     if (userProfile.photoUrl.isNotEmpty()) {
-                        AsyncImage(model = userProfile.photoUrl, contentDescription = "Photo de profil", modifier = Modifier.size(80.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+                        AsyncImage(
+                            model = userProfile.photoUrl,
+                            contentDescription = "Photo",
+                            modifier = Modifier.size(80.dp).clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
                     } else {
-                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
                         }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                        ProfileStat(count = userPosts.size.toString(), label = "Posts")
+                        // On utilise profileViewModel.userPosts.size pour que le chiffre change direct
+                        ProfileStat(count = profileViewModel.userPosts.size.toString(), label = "Posts")
                         ProfileStat(count = userProfile.favorites.size.toString(), label = "Favoris")
                     }
                 }
@@ -73,19 +82,24 @@ fun ProfileScreen(
                 Text(text = userProfile.bio, fontSize = 14.sp)
 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                    Icon(Icons.Default.LocationOn, contentDescription = "Location", modifier = Modifier.size(16.dp), tint = Color.Gray)
+                    Icon(Icons.Default.LocationOn, modifier = Modifier.size(16.dp), contentDescription = null, tint = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = userProfile.location, color = Color.Gray, fontSize = 14.sp)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Button(onClick = onEditClick, modifier = Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(8.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black)) {
+                Button(
+                    onClick = onEditClick,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black)
+                ) {
                     Text("Modifier le profil", fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            // --- SYSTÈME D'ONGLETS ---
+            // --- ONGLETS ---
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.White,
@@ -97,35 +111,23 @@ fun ProfileScreen(
                     )
                 }
             ) {
-                Tab(
-                    selected = selectedTabIndex == 0,
-                    onClick = { selectedTabIndex = 0 },
-                    text = { Text("Mes Posts", fontWeight = if (selectedTabIndex == 0) FontWeight.Bold else FontWeight.Normal) }
-                )
-                Tab(
-                    selected = selectedTabIndex == 1,
-                    onClick = { selectedTabIndex = 1 },
-                    text = { Text("Favoris", fontWeight = if (selectedTabIndex == 1) FontWeight.Bold else FontWeight.Normal) }
-                )
+                Tab(selected = selectedTabIndex == 0, onClick = { selectedTabIndex = 0 }, text = { Text("Mes Posts") })
+                Tab(selected = selectedTabIndex == 1, onClick = { selectedTabIndex = 1 }, text = { Text("Favoris") })
             }
 
-            // --- AFFICHAGE DE LA GRILLE ---
-            val currentGridPosts = if (selectedTabIndex == 0) userPosts else favoritePosts
+            // --- GRILLE DES POSTS (CORRIGÉE POUR LE TEMPS RÉEL) ---
+            val currentGridPosts = if (selectedTabIndex == 0) profileViewModel.userPosts else profileViewModel.favoritePosts
 
             if (currentGridPosts.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = if (selectedTabIndex == 0) "Aucune publication" else "Aucun favori ajouté",
-                        color = Color.Gray
-                    )
+                Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
+                    Text("Aucun post pour le moment", color = Color.Gray, fontSize = 14.sp)
                 }
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(bottom = 90.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(currentGridPosts) { post ->
+                    items(currentGridPosts, key = { it.id }) { post -> // Ajout d'une clé unique pour aider Compose
                         AsyncImage(
                             model = post.imageUrl,
                             contentDescription = null,
@@ -133,7 +135,7 @@ fun ProfileScreen(
                                 .aspectRatio(1f)
                                 .padding(1.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .clickable { selectedPostForDetail = post }, // CLIC POUR OUVRIR LE DÉTAIL
+                                .clickable { selectedPostForDetail = post },
                             contentScale = ContentScale.Crop
                         )
                     }
@@ -142,21 +144,27 @@ fun ProfileScreen(
         }
     }
 
-    // --- DIALOGUE DE DÉTAIL (Affiche le post complet au clic) ---
+    // --- DIALOGUE DE DÉTAIL ---
     selectedPostForDetail?.let { post ->
-        // On calcule ici si le post est en favori pour l'envoyer au dialogue
         val isFavorite = userProfile.favorites.contains(post.id)
 
         PostDetailDialog(
             post = post,
-            isFavorite = isFavorite, // <-- CORRECTION : Paramètre maintenant fourni
+            isFavorite = isFavorite,
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
-            onCommentClick = { /* Optionnel : naviguer vers commentaires */ },
+            onCommentClick = { /* Action pour ouvrir les commentaires */ },
             onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
             onDeleteClick = {
-                postViewModel.deletePost(post)
+                // 1. Fermer le dialogue tout de suite
                 selectedPostForDetail = null
+
+                // 2. Lancer la suppression réelle dans Firebase via PostViewModel
+                postViewModel.deletePost(post)
+
+                // 3. RAFRAÎCHISSEMENT MANUEL : On enlève le post de la liste du profil
+                // sans attendre que l'application soit relancée.
+                profileViewModel.removePostLocally(post.id)
             },
             onReportClick = { postViewModel.reportPost(post) },
             onFavoriteClick = { postViewModel.toggleFavorite(post.id) }

@@ -17,9 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,13 +28,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.example.travelhub.features.profile.ProfileViewModel // Import ajouté
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPostScreen(
     onPostSuccess: () -> Unit = {},
-    viewModel: PostViewModel = viewModel()
+    postViewModel: PostViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel() // Ajouté ici
 ) {
     var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -49,7 +48,7 @@ fun AddPostScreen(
     var selectedCategory by remember { mutableStateOf("") }
 
     val context = LocalContext.current
-    val isUploading by viewModel.isUploading.collectAsState()
+    val isUploading by postViewModel.isUploading.collectAsState()
 
     val availableTags = listOf("Coucher de soleil", "Architecture", "Calme", "Gratuit", "Hiver")
     val selectedTags = remember { mutableStateListOf<String>() }
@@ -190,13 +189,16 @@ fun AddPostScreen(
                     onClick = {
                         expandedMenu = false
                         selectedImageUri?.let { uri ->
-                            viewModel.uploadPost(
+                            postViewModel.uploadPost(
                                 imageUri = uri,
                                 description = description,
                                 location = location,
                                 category = selectedCategory,
                                 tags = selectedTags.toList()
                             ) {
+                                // --- ACTION CRUCIALE ICI ---
+                                profileViewModel.loadUserPosts()
+
                                 Toast.makeText(context, "Post publié !", Toast.LENGTH_LONG).show()
                                 onPostSuccess()
                             }

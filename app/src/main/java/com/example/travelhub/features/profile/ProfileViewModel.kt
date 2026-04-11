@@ -1,6 +1,7 @@
 package com.example.travelhub.features.profile
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -12,6 +13,7 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.storage.FirebaseStorage
 
+// Data class alignée sur Firestore
 data class UserProfile(
     val nom: String = "",
     val prenom: String = "",
@@ -20,7 +22,7 @@ data class UserProfile(
     val location: String = "",
     val photoUrl: String = "",
     val interests: List<String> = emptyList(),
-    val favorites: List<String> = emptyList() // Ajout du champ favoris
+    val favorites: List<String> = emptyList()
 )
 
 class ProfileViewModel : ViewModel() {
@@ -28,6 +30,7 @@ class ProfileViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
 
+    // --- ÉTATS OBSERVABLES ---
     var userProfile by mutableStateOf(UserProfile())
         private set
 
@@ -37,7 +40,6 @@ class ProfileViewModel : ViewModel() {
     var userPosts by mutableStateOf<List<Post>>(emptyList())
         private set
 
-    // --- NOUVEAU : Liste des posts favoris réels ---
     var favoritePosts by mutableStateOf<List<Post>>(emptyList())
         private set
 
@@ -46,70 +48,112 @@ class ProfileViewModel : ViewModel() {
         loadUserPosts()
     }
 
+    // --- CHARGEMENT DU PROFIL (TEMPS RÉEL) ---
     private fun loadUserProfile() {
         val userId = auth.currentUser?.uid ?: return
         firestore.collection("users").document(userId)
             .addSnapshotListener { document, error ->
-                if (error != null) return@addSnapshotListener
+                if (error != null) {
+                    isLoading = false
+                    return@addSnapshotListener
+                }
                 if (document != null && document.exists()) {
-                    val favs = (document.get("favorites") as? List<String>) ?: emptyList()
-                    userProfile = UserProfile(
-                        nom = document.getString("nom") ?: "",
-                        prenom = document.getString("prenom") ?: "",
-                        username = document.getString("username") ?: "",
-                        bio = document.getString("bio") ?: "",
-                        location = document.getString("location") ?: "",
-                        photoUrl = document.getString("photoUrl") ?: "",
-                        interests = (document.get("interests") as? List<String>) ?: emptyList(),
-                        favorites = favs
-                    )
-                    // Dès que le profil change, on recharge les favoris réels
-                    loadFavoritePosts(favs)
+                    val profile = document.toObject(UserProfile::class.java)
+                    if (profile != null) {
+                        userProfile = profile
+                        // Met à jour la liste des posts favoris dès que les IDs changent
+                        loadFavoritePosts(profile.favorites)
+                    }
                 }
                 isLoading = false
             }
     }
 
-    private fun loadUserPosts() {
+    // --- CHARGEMENT DES POSTS DE L'UTILISATEUR ---
+    fun loadUserPosts() {
         val userId = auth.currentUser?.uid ?: return
+
         firestore.collection("posts")
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
-                if (e != null) return@addSnapshotListener
-                userPosts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                if (e != null) {
+                    Log.e("ProfileViewModel", "Erreur écoute: ${e.message}")
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null) {
+                    // .toList() est CRUCIAL ici : il crée une nouvelle instance de liste.
+                    // Sans ça, Compose peut croire que la liste est la même et ne pas rafraîchir.
+                    userPosts = snapshot.toObjects(Post::class.java).toList()
+                    Log.d("ProfileViewModel", "Profil synchronisé : ${userPosts.size} posts")
+                }
             }
     }
 
-    // --- NOUVELLE FONCTION : Charger les posts depuis les IDs favoris ---
+    // --- CHARGEMENT DES POSTS FAVORIS ---
     private fun loadFavoritePosts(favoriteIds: List<String>) {
         if (favoriteIds.isEmpty()) {
             favoritePosts = emptyList()
             return
         }
 
-        // Firestore limite whereIn à 10 ou 30 IDs selon la version, suffisant ici
         firestore.collection("posts")
             .whereIn(FieldPath.documentId(), favoriteIds)
             .addSnapshotListener { snapshot, e ->
-                if (e != null) return@addSnapshotListener
-                favoritePosts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+                if (e != null) {
+                    Log.e("ProfileViewModel", "Erreur favoris: ${e.message}")
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    favoritePosts = snapshot.toObjects(Post::class.java)
+                }
             }
     }
 
-    fun updateUserProfile(nom: String, prenom: String, username: String, bio: String, location: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    // --- MISE À JOUR DU PROFIL ---
+    fun updateUserProfile(
+        nom: String,
+        prenom: String,
+        username: String,
+        bio: String,
+        location: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         val userId = auth.currentUser?.uid ?: return
-        val updates = hashMapOf<String, Any>("nom" to nom, "prenom" to prenom, "username" to username, "bio" to bio, "location" to location)
-        firestore.collection("users").document(userId).update(updates).addOnSuccessListener { onSuccess() }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+        val updates = hashMapOf<String, Any>(
+            "nom" to nom,
+            "prenom" to prenom,
+            "username" to username,
+            "bio" to bio,
+            "location" to location
+        )
+
+        firestore.collection("users").document(userId)
+            .update(updates)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
     }
 
+    // --- UPLOAD IMAGE DE PROFIL ---
     fun uploadProfileImage(uri: Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val userId = auth.currentUser?.uid ?: return
         val storageRef = storage.reference.child("profile_images/$userId.jpg")
+
         storageRef.putFile(uri).addOnSuccessListener {
             storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
-                firestore.collection("users").document(userId).update("photoUrl", downloadUrl.toString()).addOnSuccessListener { onSuccess() }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+                firestore.collection("users").document(userId)
+                    .update("photoUrl", downloadUrl.toString())
+                    .addOnSuccessListener { onSuccess() }
+                    .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur Firestore") }
             }
-        }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+        }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur Storage") }
+    }
+
+    fun removePostLocally(postId: String) {
+        // On filtre la liste actuelle pour enlever le post supprimé
+        // Cela force Compose à redessiner la grille SANS le post
+        userPosts = userPosts.filter { it.id != postId }
     }
 }

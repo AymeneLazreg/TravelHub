@@ -78,7 +78,7 @@ fun Comments(post: Post, viewModel: PostViewModel) {
             )
             IconButton(onClick = {
                 if (commentText.isNotBlank()) {
-                    viewModel.addComment(post.id, commentText)
+                    viewModel.addComment(post, commentText)
                     commentText = ""
                 }
             }) {

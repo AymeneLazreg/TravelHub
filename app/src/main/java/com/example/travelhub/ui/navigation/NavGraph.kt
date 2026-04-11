@@ -1,6 +1,7 @@
 package com.example.travelhub.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -8,12 +9,20 @@ import com.example.travelhub.features.auth.LoginScreen
 import com.example.travelhub.features.auth.RegisterScreen
 import com.example.travelhub.features.main.MainScreen
 import com.example.travelhub.features.profile.EditProfileScreen
+import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.travelpath.TravelPathPreferencesScreen
-import com.example.travelhub.features.travelshare.NotificationsScreen // N'oublie pas l'import !
+import com.example.travelhub.features.travelshare.NotificationsScreen
+import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
+import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
+
+    // Instances uniques partagées pour toute la session
+    val notificationViewModel: NotificationViewModel = viewModel()
+    val postViewModel: PostViewModel = viewModel()
+    val profileViewModel: ProfileViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -35,7 +44,12 @@ fun NavGraph() {
         }
 
         composable("home") {
-            MainScreen(navController = navController)
+            MainScreen(
+                navController = navController,
+                notificationViewModel = notificationViewModel,
+                postViewModel = postViewModel,
+                profileViewModel = profileViewModel
+            )
         }
 
         composable("travel_preferences") {
@@ -52,10 +66,10 @@ fun NavGraph() {
             )
         }
 
-        // --- AJOUT DE LA ROUTE NOTIFICATIONS ICI ---
         composable("notifications") {
             NotificationsScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                viewModel = notificationViewModel // Reçoit la même instance
             )
         }
     }

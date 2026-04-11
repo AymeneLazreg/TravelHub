@@ -12,10 +12,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
 import com.example.travelhub.features.profile.ProfileScreen
+import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.travelpath.TravelPathScreen
 import com.example.travelhub.features.travelshare.AddPostScreen
 import com.example.travelhub.features.travelshare.HomeScreen
 import com.example.travelhub.features.travelshare.SearchScreen
+import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
+import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 
 data class BottomNavItem(
     val name: String,
@@ -24,7 +27,12 @@ data class BottomNavItem(
 )
 
 @Composable
-fun MainScreen(navController: NavController) {
+fun MainScreen(
+    navController: NavController,
+    notificationViewModel: NotificationViewModel,
+    postViewModel: PostViewModel,
+    profileViewModel: ProfileViewModel
+) {
     var currentRoute by remember { mutableStateOf("accueil") }
 
     val items = listOf(
@@ -55,17 +63,28 @@ fun MainScreen(navController: NavController) {
         ) {
             when (currentRoute) {
                 "accueil" -> HomeScreen(
+                    viewModel = postViewModel,
+                    profileViewModel = profileViewModel,
+                    notificationViewModel = notificationViewModel,
                     onNotificationsClick = {
-                        // Action de navigation vers l'écran de notifications
                         navController.navigate("notifications")
                     }
                 )
                 "recherche" -> SearchScreen()
                 "ajout" -> AddPostScreen(
-                    onPostSuccess = { currentRoute = "accueil" }
+                    postViewModel = postViewModel,      // Passe l'instance partagée
+                    profileViewModel = profileViewModel, // Passe l'instance partagée
+                    onPostSuccess = {
+                        // On retourne à l'accueil
+                        currentRoute = "accueil"
+                        // On force la mise à jour du profil en arrière-plan
+                        profileViewModel.loadUserPosts()
+                    }
                 )
                 "profil" -> ProfileScreen(
-                    onEditClick = { navController.navigate("edit_profile") }
+                    onEditClick = { navController.navigate("edit_profile") },
+                    profileViewModel = profileViewModel,
+                    postViewModel = postViewModel
                 )
                 "voyager" -> TravelPathScreen(
                     onNewSearchClick = { navController.navigate("travel_preferences") }
