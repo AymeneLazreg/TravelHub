@@ -31,9 +31,10 @@ fun Comments(post: Post, viewModel: PostViewModel) {
     var commentText by remember { mutableStateOf("") }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    // État pour la suppression
+    // États pour les actions
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var commentToDelete by remember { mutableStateOf<Comment?>(null) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var selectedComment by remember { mutableStateOf<Comment?>(null) }
 
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp).navigationBarsPadding()) {
         Text("Commentaires", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -48,15 +49,18 @@ fun Comments(post: Post, viewModel: PostViewModel) {
                         comment = comment,
                         isMyComment = comment.userId == currentUserId,
                         onLongPress = {
-                            commentToDelete = comment
-                            showDeleteDialog = true
+                            selectedComment = comment
+                            if (comment.userId == currentUserId) {
+                                showDeleteDialog = true
+                            } else {
+                                showReportDialog = true
+                            }
                         }
                     )
                 }
             }
         }
 
-        // Zone de saisie (inchangée)
         Spacer(modifier = Modifier.height(16.dp))
         Row(modifier = Modifier.fillMaxWidth().imePadding(), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
@@ -83,20 +87,37 @@ fun Comments(post: Post, viewModel: PostViewModel) {
         }
     }
 
-    // Dialogue de confirmation
-    if (showDeleteDialog && commentToDelete != null) {
+    // --- DIALOGUE DE SUPPRESSION ---
+    if (showDeleteDialog && selectedComment != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Supprimer ?") },
-            text = { Text("Voulez-vous supprimer ce commentaire ?") },
+            text = { Text("Voulez-vous supprimer votre commentaire ?") },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteComment(post.id, commentToDelete!!)
+                    viewModel.deleteComment(post.id, selectedComment!!)
                     showDeleteDialog = false
                 }) { Text("Supprimer", color = Color.Red) }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) { Text("Annuler") }
+            }
+        )
+    }
+
+    // --- DIALOGUE DE SIGNALEMENT ---
+    if (showReportDialog && selectedComment != null) {
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = { Text("Signaler ce commentaire ?") },
+            text = { Text("Ce commentaire va être envoyé à la modération pour examen.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showReportDialog = false
+                }) { Text("Signaler", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }) { Text("Annuler") }
             }
         )
     }
@@ -110,7 +131,7 @@ fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) 
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { },
-                onLongClick = { if (isMyComment) onLongPress() } // On n'active le clic long que si c'est le nôtre
+                onLongClick = { onLongPress() }
             )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.Top
@@ -126,7 +147,7 @@ fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(comment.username, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(8.dp))
-                // Conversion Timestamp vers Long pour formatTimestamp
+                // On multiplie par 1000 pour transformer les secondes Firebase en millisecondes Kotlin
                 Text(formatTimestamp(comment.timestamp.seconds * 1000), fontSize = 12.sp, color = Color.Gray)
             }
             Text(comment.text, fontSize = 14.sp, color = Color.DarkGray)
@@ -134,6 +155,7 @@ fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) 
     }
 }
 
+// FONCTION UTILITAIRE POUR LA DATE
 fun formatTimestamp(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
