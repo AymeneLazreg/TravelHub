@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState // <-- IMPORT CRITIQUE
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,14 +21,17 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onAnonymousClick: () -> Unit,
-    authViewModel: AuthViewModel = viewModel() // <-- On injecte le chef d'orchestre
+    authViewModel: AuthViewModel = viewModel()
 ) {
-    var email by remember { mutableStateOf("") }
+    // 1. On récupère l'email sauvegardé depuis le ViewModel
+    val savedEmail by authViewModel.savedEmail.observeAsState("")
+
+    // 2. On initialise le champ email avec la valeur sauvegardée
+    // Le remember(savedEmail) permet de rafraîchir le champ dès que savedEmail change
+    var email by remember(savedEmail) { mutableStateOf(savedEmail ?: "") }
     var password by remember { mutableStateOf("") }
 
-    // État de chargement
     var isLoading by remember { mutableStateOf(false) }
-
     val context = LocalContext.current
 
     Column(
@@ -44,7 +48,7 @@ fun LoginScreen(
             modifier = Modifier.padding(bottom = 48.dp)
         )
 
-        // Champ Email
+        // Champ Email (rempli automatiquement si savedEmail existe)
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -56,7 +60,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Champ Mot de passe
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -69,20 +72,17 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Bouton Connexion
         Button(
             onClick = {
                 if (email.isNotEmpty() && password.isNotEmpty()) {
-                    isLoading = true // Début du chargement
-
-                    // On demande à Firebase de vérifier les identifiants
+                    isLoading = true
                     authViewModel.loginUser(
                         email = email.trim(),
                         pass = password.trim(),
                         onSuccess = {
                             isLoading = false
                             Toast.makeText(context, "Connexion réussie !", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess() // Redirection vers l'accueil
+                            onLoginSuccess()
                         },
                         onError = { errorMessage ->
                             isLoading = false
@@ -95,7 +95,7 @@ fun LoginScreen(
             },
             modifier = Modifier.fillMaxWidth().height(50.dp),
             shape = MaterialTheme.shapes.medium,
-            enabled = !isLoading // Désactivé pendant le chargement
+            enabled = !isLoading
         ) {
             if (isLoading) {
                 CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(24.dp))
