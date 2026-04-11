@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.automirrored.filled.Logout // Icône de déconnexion
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -26,10 +27,12 @@ import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun ProfileScreen(
     onEditClick: () -> Unit,
+    onLogoutClick: () -> Unit, // Nouvelle callback pour la redirection après déconnexion
     profileViewModel: ProfileViewModel,
     postViewModel: PostViewModel
 ) {
@@ -48,7 +51,26 @@ fun ProfileScreen(
         } else {
             // --- HEADER DU PROFIL ---
             Column(modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
-                Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+
+                // Ligne du haut : Pseudo + Bouton Déconnexion
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+
+                    IconButton(onClick = {
+                        FirebaseAuth.getInstance().signOut()
+                        onLogoutClick()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "Déconnexion",
+                            tint = Color.Black
+                        )
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -72,7 +94,6 @@ fun ProfileScreen(
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                        // On utilise profileViewModel.userPosts.size pour que le chiffre change direct
                         ProfileStat(count = profileViewModel.userPosts.size.toString(), label = "Posts")
                         ProfileStat(count = userProfile.favorites.size.toString(), label = "Favoris")
                     }
@@ -127,7 +148,7 @@ fun ProfileScreen(
                     columns = GridCells.Fixed(3),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(currentGridPosts, key = { it.id }) { post -> // Ajout d'une clé unique pour aider Compose
+                    items(currentGridPosts, key = { it.id }) { post ->
                         AsyncImage(
                             model = post.imageUrl,
                             contentDescription = null,
@@ -163,7 +184,6 @@ fun ProfileScreen(
                 postViewModel.deletePost(post)
 
                 // 3. RAFRAÎCHISSEMENT MANUEL : On enlève le post de la liste du profil
-                // sans attendre que l'application soit relancée.
                 profileViewModel.removePostLocally(post.id)
             },
             onReportClick = { postViewModel.reportPost(post) },

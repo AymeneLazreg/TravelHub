@@ -50,7 +50,13 @@ fun MainScreen(
                     NavigationBarItem(
                         icon = { Icon(item.icon, contentDescription = item.name) },
                         selected = currentRoute == item.route,
-                        onClick = { currentRoute = item.route },
+                        onClick = {
+                            currentRoute = item.route
+                            // Rafraîchissement automatique si on clique sur l'onglet Profil
+                            if (item.route == "profil") {
+                                profileViewModel.loadUserPosts()
+                            }
+                        },
                         alwaysShowLabel = false
                     )
                 }
@@ -83,6 +89,13 @@ fun MainScreen(
                 )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },
+                    onLogoutClick = {
+                        // Redirection vers l'écran de login/auth
+                        // popUpTo(0) permet d'effacer tout l'historique pour éviter de revenir en arrière
+                        navController.navigate("login") {
+                            popUpTo(0)
+                        }
+                    },
                     profileViewModel = profileViewModel,
                     postViewModel = postViewModel
                 )
