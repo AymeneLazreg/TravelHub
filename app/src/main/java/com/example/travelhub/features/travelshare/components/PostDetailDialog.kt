@@ -15,8 +15,8 @@ import com.example.travelhub.features.travelshare.model.Post
 @Composable
 fun PostDetailDialog(
     post: Post,
+    isFavorite: Boolean, // <-- Ajouté
     onDismiss: () -> Unit,
-    // On repasse les mêmes actions que pour le PostItem
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onShowLikers: () -> Unit,
@@ -26,25 +26,20 @@ fun PostDetailDialog(
 ) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false) // Plein écran
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Publication", style = MaterialTheme.typography.titleMedium) },
-                    navigationIcon = {
-                        IconButton(onClick = onDismiss) {
-                            Icon(Icons.Default.Close, contentDescription = "Fermer")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                    title = { Text("Publication") },
+                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) } }
                 )
             }
         ) { padding ->
-            Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-                // On réutilise ton PostItem tel quel !
+            Box(modifier = Modifier.padding(padding)) {
                 PostItem(
                     post = post,
+                    isFavorite = isFavorite, // <-- Transmis ici
                     onLikeClick = onLikeClick,
                     onCommentClick = onCommentClick,
                     onShowLikers = onShowLikers,

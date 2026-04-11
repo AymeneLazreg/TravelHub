@@ -144,8 +144,12 @@ fun ProfileScreen(
 
     // --- DIALOGUE DE DÉTAIL (Affiche le post complet au clic) ---
     selectedPostForDetail?.let { post ->
+        // On calcule ici si le post est en favori pour l'envoyer au dialogue
+        val isFavorite = userProfile.favorites.contains(post.id)
+
         PostDetailDialog(
             post = post,
+            isFavorite = isFavorite, // <-- CORRECTION : Paramètre maintenant fourni
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { /* Optionnel : naviguer vers commentaires */ },

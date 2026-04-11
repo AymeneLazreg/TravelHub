@@ -6,9 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -19,11 +16,18 @@ import com.example.travelhub.features.travelshare.components.PostItem
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.example.travelhub.features.profile.ProfileViewModel // Import du ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(viewModel: PostViewModel = viewModel()) {
+fun HomeScreen(
+    viewModel: PostViewModel = viewModel(),
+    profileViewModel: ProfileViewModel = viewModel() // Ajout du ViewModel de profil
+) {
     val posts by viewModel.posts.collectAsState()
+
+    // On observe le profil utilisateur pour connaître ses favoris
+    val userProfile = profileViewModel.userProfile
 
     // États pour contrôler l'affichage des fenêtres surgissantes
     var showLikersSheet by remember { mutableStateOf(false) }
@@ -45,8 +49,12 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(posts) { post ->
+                        // VERIFICATION : Le post actuel est-il dans la liste des favoris ?
+                        val isFavorite = userProfile.favorites.contains(post.id)
+
                         PostItem(
                             post = post,
+                            isFavorite = isFavorite, // On passe l'état au composant
                             onLikeClick = { viewModel.toggleLike(post) },
                             onCommentClick = {
                                 selectedPostId = post.id
@@ -58,7 +66,6 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
                             },
                             onDeleteClick = { viewModel.deletePost(post) },
                             onReportClick = { viewModel.reportPost(post) },
-                            // --- AJOUT DE L'ACTION FAVORIS ICI ---
                             onFavoriteClick = { viewModel.toggleFavorite(post.id) }
                         )
                     }

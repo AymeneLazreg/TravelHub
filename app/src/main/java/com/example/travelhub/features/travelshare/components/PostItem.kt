@@ -25,17 +25,17 @@ import java.util.*
 @Composable
 fun PostItem(
     post: Post,
+    isFavorite: Boolean,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
-    onFavoriteClick: () -> Unit // <-- AJOUTÉ : Action pour les favoris
+    onFavoriteClick: () -> Unit
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val isLiked = post.likedBy.contains(currentUserId)
     val relativeTime = getRelativeTime(post.timestamp.toDate())
-
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
@@ -44,7 +44,6 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column {
-            // --- HEADER ---
             Row(
                 modifier = Modifier.padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -64,7 +63,6 @@ fun PostItem(
                     Text(post.locationName, fontSize = 12.sp, color = Color.Gray)
                 }
 
-                // --- BOUTON 3 POINTS ---
                 Box {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreHoriz, contentDescription = "Options")
@@ -78,35 +76,30 @@ fun PostItem(
                             DropdownMenuItem(
                                 text = { Text("Supprimer", color = Color.Red) },
                                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
-                                onClick = {
-                                    showMenu = false
-                                    onDeleteClick()
-                                }
+                                onClick = { showMenu = false; onDeleteClick() }
                             )
                         } else {
-                            // OPTION FAVORIS (Remplace Enregistrer)
                             DropdownMenuItem(
-                                text = { Text("Ajouter aux favoris") },
-                                leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700)) },
-                                onClick = {
-                                    showMenu = false
-                                    onFavoriteClick() // Déclenche l'ajout en base
-                                }
+                                text = { Text(if (isFavorite) "Supprimer des favoris" else "Ajouter aux favoris") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                                        contentDescription = null,
+                                        tint = if (isFavorite) Color(0xFFFFD700) else Color.Black
+                                    )
+                                },
+                                onClick = { showMenu = false; onFavoriteClick() }
                             )
                             DropdownMenuItem(
                                 text = { Text("Signaler", color = Color.Red) },
                                 leadingIcon = { Icon(Icons.Default.Report, contentDescription = null, tint = Color.Red) },
-                                onClick = {
-                                    showMenu = false
-                                    onReportClick()
-                                }
+                                onClick = { showMenu = false; onReportClick() }
                             )
                         }
                     }
                 }
             }
 
-            // --- IMAGE ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -114,11 +107,7 @@ fun PostItem(
                 contentScale = ContentScale.Crop
             )
 
-            // --- ACTIONS (LIKE & COMMENT) ---
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onLikeClick) {
                         Icon(
@@ -127,51 +116,27 @@ fun PostItem(
                             tint = if (isLiked) Color.Red else Color.Black
                         )
                     }
-                    Text(
-                        text = "${post.likesCount}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.clickable { onShowLikers() }
-                    )
+                    Text(text = "${post.likesCount}", fontSize = 14.sp, modifier = Modifier.clickable { onShowLikers() })
                 }
-
                 Spacer(modifier = Modifier.width(16.dp))
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onCommentClick) {
-                        Icon(
-                            imageVector = Icons.Outlined.ModeComment,
-                            contentDescription = "Commentaires",
-                            modifier = Modifier.size(22.dp)
-                        )
+                        Icon(imageVector = Icons.Outlined.ModeComment, contentDescription = null, modifier = Modifier.size(22.dp))
                     }
-                    Text(
-                        text = "${post.comments.size}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Text(text = "${post.comments.size}", fontSize = 14.sp)
                 }
             }
 
-            // --- DESCRIPTION ---
             Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
                 Text(text = post.description, fontSize = 14.sp)
-                if (post.tags.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = post.tags.joinToString(" ") { "#$it" },
-                        color = Color(0xFF007AFF),
-                        fontSize = 13.sp
-                    )
-                }
             }
         }
     }
 }
 
-// --- FONCTION UTILITAIRE  ---
-fun getRelativeTime(date: Date): String {
-    val now = Date().time
+// FONCTION SORTIE DE LA CLASSE POUR ETRE ACCESSIBLE
+fun getRelativeTime(date: java.util.Date): String {
+    val now = java.util.Date().time
     val diff = now - date.time
 
     val seconds = diff / 1000
