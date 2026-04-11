@@ -7,6 +7,7 @@ import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.FieldValue // On importe la classe parente
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -64,7 +65,9 @@ class PostViewModel : ViewModel() {
                     imageUrl = downloadUrl.toString(),
                     description = description,
                     locationName = location,
-                    tags = tags
+                    tags = tags,
+                    likesCount = 0,
+                    likedBy = emptyList()
                 )
 
                 firestore.collection("posts").document(postId).set(newPost).await()
@@ -74,6 +77,25 @@ class PostViewModel : ViewModel() {
             } catch (e: Exception) {
                 _isUploading.value = false
             }
+        }
+    }
+
+    fun toggleLike(post: Post) {
+        val currentUser = auth.currentUser ?: return
+        val postRef = firestore.collection("posts").document(post.id)
+
+        if (post.likedBy.contains(currentUser.uid)) {
+            // L'utilisateur a déjà liké -> On retire le like
+            postRef.update(
+                "likesCount", FieldValue.increment(-1L),
+                "likedBy", FieldValue.arrayRemove(currentUser.uid)
+            )
+        } else {
+            // L'utilisateur n'a pas encore liké -> On ajoute le like (Union évite les doublons)
+            postRef.update(
+                "likesCount", FieldValue.increment(1L),
+                "likedBy", FieldValue.arrayUnion(currentUser.uid)
+            )
         }
     }
 }

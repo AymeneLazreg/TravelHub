@@ -24,13 +24,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: PostViewModel = viewModel()
 ) {
-    // Collecte des posts depuis Firestore via le StateFlow du ViewModel
     val posts by viewModel.posts.collectAsState()
 
     Column(
@@ -38,7 +38,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Color.White)
     ) {
-        // --- Barre de recherche (UI de ta maquette) ---
+        // --- Barre de recherche ---
         OutlinedTextField(
             value = "",
             onValueChange = {},
@@ -56,7 +56,7 @@ fun HomeScreen(
             )
         )
 
-        // --- Filtres de catégories [cite: 16, 32] ---
+        // --- Filtres de catégories ---
         val filters = listOf("All", "Nature", "City", "Beach", "Museum")
         LazyRow(
             modifier = Modifier
@@ -67,7 +67,7 @@ fun HomeScreen(
             items(filters) { filter ->
                 FilterChip(
                     selected = filter == "All",
-                    onClick = { /* Logique de filtrage à implémenter */ },
+                    onClick = { /* Logique de filtrage */ },
                     label = { Text(filter) },
                     shape = RoundedCornerShape(16.dp)
                 )
@@ -78,7 +78,6 @@ fun HomeScreen(
 
         // --- Fil d'actualité dynamique ---
         if (posts.isEmpty()) {
-            // Affichage pendant le chargement ou si aucun post n'existe
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color.Black)
             }
@@ -88,7 +87,8 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 80.dp)
             ) {
                 items(posts) { post ->
-                    PostItem(post = post)
+                    // PASSAGE DU VIEWMODEL ICI
+                    PostItem(post = post, viewModel = viewModel)
                     HorizontalDivider(
                         color = Color(0xFFEEEEEE),
                         thickness = 1.dp,
@@ -101,13 +101,17 @@ fun HomeScreen(
 }
 
 @Composable
-fun PostItem(post: Post) {
+fun PostItem(post: Post, viewModel: PostViewModel) {
+    // Récupération de l'utilisateur actuel pour vérifier si le post est liké
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val isLiked = post.likedBy.contains(currentUser?.uid)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        // En-tête : Infos utilisateur et lieu [cite: 14, 24]
+        // En-tête : Infos utilisateur et lieu
         Row(verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = post.userProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.username}" },
@@ -136,7 +140,7 @@ fun PostItem(post: Post) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Image principale du voyage chargée depuis Firebase Storage [cite: 11]
+        // Image principale
         AsyncImage(
             model = post.imageUrl,
             contentDescription = "Travel Photo",
@@ -149,21 +153,26 @@ fun PostItem(post: Post) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Description du post [cite: 19, 27]
+        // Description
         if (post.description.isNotEmpty()) {
             Text(text = post.description, fontSize = 14.sp)
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Barre d'interactions : Like, Commentaires et Localisation [cite: 15, 36, 44]
+        // Barre d'interactions : Like, Commentaires et Localisation
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.FavoriteBorder,
-                contentDescription = "Like",
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
+
+            // BOUTON LIKE INTERACTIF
+            IconButton(onClick = { viewModel.toggleLike(post) }) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Like",
+                    tint = if (isLiked) Color.Red else Color.Black,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
             Text(text = "${post.likesCount} likes", fontSize = 14.sp, fontWeight = FontWeight.Medium)
 
             Spacer(modifier = Modifier.width(16.dp))
