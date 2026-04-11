@@ -43,6 +43,7 @@ class PostViewModel : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
+    // --- LIKES & COMMENTS STATES ---
     private val _likersDetails = MutableStateFlow<List<UserProfile>>(emptyList())
     val likersDetails: StateFlow<List<UserProfile>> = _likersDetails
 
@@ -64,40 +65,43 @@ class PostViewModel : ViewModel() {
     fun onSearchQueryChanged(newQuery: String) { _searchQuery.value = newQuery }
     fun onCategorySelected(category: String?) { _selectedCategory.value = category }
 
-    fun uploadPost(imageUri: Uri, description: String, location: String, category: String, tags: List<String>, onComplete: () -> Unit) {
+    // --- GESTION DES LIKES ---
+    fun toggleLike(post: Post) {
         val currentUser = auth.currentUser ?: return
+        val postRef = firestore.collection("posts").document(post.id)
+
+        if (post.likedBy.contains(currentUser.uid)) {
+            postRef.update(
+                "likesCount", FieldValue.increment(-1L),
+                "likedBy", FieldValue.arrayRemove(currentUser.uid)
+            )
+        } else {
+            postRef.update(
+                "likesCount", FieldValue.increment(1L),
+                "likedBy", FieldValue.arrayUnion(currentUser.uid)
+            )
+        }
+    }
+
+    fun fetchLikersDetails(userIds: List<String>) {
+        if (userIds.isEmpty()) {
+            _likersDetails.value = emptyList()
+            return
+        }
         viewModelScope.launch {
-            _isUploading.value = true
             try {
-                val fileName = "posts/${UUID.randomUUID()}.jpg"
-                val storageRef = storage.reference.child(fileName)
-                storageRef.putFile(imageUri).await()
-                val downloadUrl = storageRef.downloadUrl.await()
-
-                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
-
-                val postId = firestore.collection("posts").document().id
-                val newPost = Post(
-                    id = postId,
-                    userId = currentUser.uid,
-                    username = userDoc.getString("username") ?: "Aventurier",
-                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
-                    imageUrl = downloadUrl.toString(),
-                    description = description,
-                    locationName = location,
-                    category = category,
-                    tags = tags
-                )
-
-                firestore.collection("posts").document(postId).set(newPost).await()
-                _isUploading.value = false
-                onComplete()
+                val snapshot = firestore.collection("users")
+                    .whereIn(FieldPath.documentId(), userIds)
+                    .get()
+                    .await()
+                _likersDetails.value = snapshot.toObjects(UserProfile::class.java)
             } catch (e: Exception) {
-                _isUploading.value = false
+                _likersDetails.value = emptyList()
             }
         }
     }
 
+    // --- GESTION DES COMMENTAIRES ---
     fun addComment(postId: String, text: String) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
@@ -125,19 +129,39 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun toggleLike(post: Post) {
+    // --- UPLOAD ---
+    fun uploadPost(imageUri: Uri, description: String, location: String, category: String, tags: List<String>, onComplete: () -> Unit) {
         val currentUser = auth.currentUser ?: return
-        val postRef = firestore.collection("posts").document(post.id)
-        if (post.likedBy.contains(currentUser.uid)) {
-            postRef.update("likesCount", FieldValue.increment(-1L), "likedBy", FieldValue.arrayRemove(currentUser.uid))
-        } else {
-            postRef.update("likesCount", FieldValue.increment(1L), "likedBy", FieldValue.arrayUnion(currentUser.uid))
-        }
-    }
+        viewModelScope.launch {
+            _isUploading.value = true
+            try {
+                val fileName = "posts/${UUID.randomUUID()}.jpg"
+                val storageRef = storage.reference.child(fileName)
+                storageRef.putFile(imageUri).await()
+                val downloadUrl = storageRef.downloadUrl.await()
 
-    fun fetchLikersDetails(userIds: List<String>) {
-        if (userIds.isEmpty()) { _likersDetails.value = emptyList(); return }
-        firestore.collection("users").whereIn(FieldPath.documentId(), userIds).get()
-            .addOnSuccessListener { snapshot -> _likersDetails.value = snapshot.toObjects(UserProfile::class.java) }
+                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
+
+                val postId = firestore.collection("posts").document().id
+                val newPost = Post(
+                    id = postId,
+                    userId = currentUser.uid,
+                    username = userDoc.getString("username") ?: "Aventurier",
+                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
+                    imageUrl = downloadUrl.toString(),
+                    description = description,
+                    locationName = location,
+                    category = category,
+                    tags = tags,
+                    timestamp = com.google.firebase.Timestamp.now()
+                )
+
+                firestore.collection("posts").document(postId).set(newPost).await()
+                _isUploading.value = false
+                onComplete()
+            } catch (e: Exception) {
+                _isUploading.value = false
+            }
+        }
     }
 }

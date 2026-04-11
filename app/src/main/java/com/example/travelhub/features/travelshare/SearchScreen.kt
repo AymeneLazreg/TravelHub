@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
@@ -32,9 +33,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
     val categories = listOf("Nature", "Musée", "Rue", "Magasin", "Restaurant")
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
+        modifier = Modifier.fillMaxSize().background(Color.White)
     ) {
         // Barre de recherche
         OutlinedTextField(
@@ -43,7 +42,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
                 searchQuery = it
                 viewModel.onSearchQueryChanged(it)
             },
-            placeholder = { Text("Lieu, tag, auteur...", color = Color.Gray) },
+            placeholder = { Text("Lieu, tag, nom d'utilisateur...", color = Color.Gray, fontSize = 14.sp) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
             modifier = Modifier
                 .fillMaxWidth()
@@ -58,7 +57,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
             singleLine = true
         )
 
-        // Filtres de catégories (Chips)
+        // Filtres par catégories
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -79,7 +78,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Grille de résultats (Réelle)
+        // Grille de résultats
         if (filteredPosts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Aucun voyage trouvé", color = Color.Gray)
