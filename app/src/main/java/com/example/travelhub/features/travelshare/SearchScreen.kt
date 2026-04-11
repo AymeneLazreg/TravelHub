@@ -7,8 +7,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,34 +32,74 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
 
+    // États pour le sélecteur de date
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+
     val categories = listOf("Nature", "Musée", "Rue", "Magasin", "Restaurant")
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(Color.White)
-    ) {
-        // Barre de recherche
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = {
-                searchQuery = it
-                viewModel.onSearchQueryChanged(it)
+    // Dialogue du DatePicker
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.onDateSelected(datePickerState.selectedDateMillis)
+                    showDatePicker = false
+                }) { Text("Confirmer") }
             },
-            placeholder = { Text("Lieu, tag, nom d'utilisateur...", color = Color.Gray, fontSize = 14.sp) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFF5F5F5),
-                unfocusedContainerColor = Color(0xFFF5F5F5),
-                focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent
-            ),
-            singleLine = true
-        )
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.onDateSelected(null)
+                    showDatePicker = false
+                }) { Text("Effacer") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
-        // Filtres par catégories
+    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        // Barre de recherche + Bouton Date
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = {
+                    searchQuery = it
+                    viewModel.onSearchQueryChanged(it)
+                },
+                placeholder = { Text("Lieu, nom, tag...", fontSize = 14.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFFF5F5F5),
+                    unfocusedContainerColor = Color(0xFFF5F5F5),
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent
+                ),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Bouton Calendrier
+            IconButton(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.size(48.dp).background(Color(0xFFF5F5F5), CircleShape)
+            ) {
+                Icon(
+                    Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = if (datePickerState.selectedDateMillis != null) Color(0xFF1976D2) else Color.Gray
+                )
+            }
+        }
+
+        // Catégories
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 16.dp),
@@ -81,7 +123,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
         // Grille de résultats
         if (filteredPosts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Aucun voyage trouvé", color = Color.Gray)
+                Text("Aucun voyage trouvé pour cette période", color = Color.Gray)
             }
         } else {
             LazyVerticalGrid(
@@ -93,11 +135,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
                     AsyncImage(
                         model = post.imageUrl,
                         contentDescription = null,
-                        modifier = Modifier
-                            .aspectRatio(1f)
-                            .padding(2.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFFF0F0F0)),
+                        modifier = Modifier.aspectRatio(1f).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF0F0F0)),
                         contentScale = ContentScale.Crop
                     )
                 }

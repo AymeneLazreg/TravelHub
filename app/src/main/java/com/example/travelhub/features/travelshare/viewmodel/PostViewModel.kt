@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
 
 class PostViewModel : ViewModel() {
 
@@ -26,24 +29,35 @@ class PostViewModel : ViewModel() {
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts
 
-    // --- RECHERCHE ---
     private val _searchQuery = MutableStateFlow("")
     private val _selectedCategory = MutableStateFlow<String?>(null)
+    private val _selectedDate = MutableStateFlow<Long?>(null)
 
-    val filteredPosts: StateFlow<List<Post>> = combine(_posts, _searchQuery, _selectedCategory) { posts, query, category ->
+    val filteredPosts: StateFlow<List<Post>> = combine(
+        _posts, _searchQuery, _selectedCategory, _selectedDate
+    ) { posts, query, category, dateMillis ->
+        val cleanQuery = query.trim().lowercase()
+
         posts.filter { post ->
-            val matchesQuery = query.isBlank() ||
-                    post.description.contains(query, ignoreCase = true) ||
-                    post.locationName.contains(query, ignoreCase = true) ||
-                    post.username.contains(query, ignoreCase = true) ||
-                    post.tags.any { it.contains(query, ignoreCase = true) }
+            val matchesQuery = cleanQuery.isBlank() ||
+                    post.username.lowercase().contains(cleanQuery) ||
+                    post.locationName.lowercase().contains(cleanQuery) ||
+                    post.description.lowercase().contains(cleanQuery) ||
+                    post.tags.any { it.lowercase().contains(cleanQuery) }
 
             val matchesCategory = category == null || post.category == category
-            matchesQuery && matchesCategory
+
+            val matchesDate = if (dateMillis == null) true else {
+                val postDate = post.timestamp.toDate()
+                val selectedDate = Date(dateMillis)
+                val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+                sdf.format(postDate) == sdf.format(selectedDate)
+            }
+
+            matchesQuery && matchesCategory && matchesDate
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
-    // --- LIKES & COMMENTS STATES ---
     private val _likersDetails = MutableStateFlow<List<UserProfile>>(emptyList())
     val likersDetails: StateFlow<List<UserProfile>> = _likersDetails
 
@@ -57,51 +71,36 @@ class PostViewModel : ViewModel() {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
-                val postList = snapshot?.toObjects(Post::class.java) ?: emptyList()
-                _posts.value = postList
+                _posts.value = snapshot?.toObjects(Post::class.java) ?: emptyList()
             }
     }
 
     fun onSearchQueryChanged(newQuery: String) { _searchQuery.value = newQuery }
     fun onCategorySelected(category: String?) { _selectedCategory.value = category }
+    fun onDateSelected(date: Long?) { _selectedDate.value = date }
 
-    // --- GESTION DES LIKES ---
+    // --- LIKES ---
     fun toggleLike(post: Post) {
         val currentUser = auth.currentUser ?: return
         val postRef = firestore.collection("posts").document(post.id)
-
         if (post.likedBy.contains(currentUser.uid)) {
-            postRef.update(
-                "likesCount", FieldValue.increment(-1L),
-                "likedBy", FieldValue.arrayRemove(currentUser.uid)
-            )
+            postRef.update("likesCount", FieldValue.increment(-1L), "likedBy", FieldValue.arrayRemove(currentUser.uid))
         } else {
-            postRef.update(
-                "likesCount", FieldValue.increment(1L),
-                "likedBy", FieldValue.arrayUnion(currentUser.uid)
-            )
+            postRef.update("likesCount", FieldValue.increment(1L), "likedBy", FieldValue.arrayUnion(currentUser.uid))
         }
     }
 
     fun fetchLikersDetails(userIds: List<String>) {
-        if (userIds.isEmpty()) {
-            _likersDetails.value = emptyList()
-            return
-        }
+        if (userIds.isEmpty()) { _likersDetails.value = emptyList(); return }
         viewModelScope.launch {
             try {
-                val snapshot = firestore.collection("users")
-                    .whereIn(FieldPath.documentId(), userIds)
-                    .get()
-                    .await()
+                val snapshot = firestore.collection("users").whereIn(FieldPath.documentId(), userIds).get().await()
                 _likersDetails.value = snapshot.toObjects(UserProfile::class.java)
-            } catch (e: Exception) {
-                _likersDetails.value = emptyList()
-            }
+            } catch (e: Exception) { _likersDetails.value = emptyList() }
         }
     }
 
-    // --- GESTION DES COMMENTAIRES ---
+    // --- COMMENTAIRES (FONCTIONS MANQUANTES AJOUTÉES ICI) ---
     fun addComment(postId: String, text: String) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
@@ -139,7 +138,6 @@ class PostViewModel : ViewModel() {
                 val storageRef = storage.reference.child(fileName)
                 storageRef.putFile(imageUri).await()
                 val downloadUrl = storageRef.downloadUrl.await()
-
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
 
                 val postId = firestore.collection("posts").document().id
@@ -155,13 +153,10 @@ class PostViewModel : ViewModel() {
                     tags = tags,
                     timestamp = com.google.firebase.Timestamp.now()
                 )
-
                 firestore.collection("posts").document(postId).set(newPost).await()
                 _isUploading.value = false
                 onComplete()
-            } catch (e: Exception) {
-                _isUploading.value = false
-            }
+            } catch (e: Exception) { _isUploading.value = false }
         }
     }
 }
