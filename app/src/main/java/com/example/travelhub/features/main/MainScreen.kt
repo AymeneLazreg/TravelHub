@@ -33,6 +33,12 @@ fun MainScreen(
     postViewModel: PostViewModel,
     profileViewModel: ProfileViewModel
 ) {
+    // --- INITIALISATION AU CHARGEMENT (LOGIN / RECONNEXION) ---
+    LaunchedEffect(Unit) {
+        profileViewModel.refreshAllData()              // Nettoie et charge le bon profil
+        notificationViewModel.refreshNotifications()    // Nettoie et charge les bonnes notifications
+    }
+
     var currentRoute by remember { mutableStateOf("accueil") }
 
     val items = listOf(
@@ -52,7 +58,7 @@ fun MainScreen(
                         selected = currentRoute == item.route,
                         onClick = {
                             currentRoute = item.route
-                            // Rafraîchissement automatique si on clique sur l'onglet Profil
+                            // Rafraîchissement manuel spécifique quand on clique sur l'onglet Profil
                             if (item.route == "profil") {
                                 profileViewModel.loadUserPosts()
                             }
@@ -78,20 +84,16 @@ fun MainScreen(
                 )
                 "recherche" -> SearchScreen()
                 "ajout" -> AddPostScreen(
-                    postViewModel = postViewModel,      // Passe l'instance partagée
-                    profileViewModel = profileViewModel, // Passe l'instance partagée
+                    postViewModel = postViewModel,
+                    profileViewModel = profileViewModel,
                     onPostSuccess = {
-                        // On retourne à l'accueil
                         currentRoute = "accueil"
-                        // On force la mise à jour du profil en arrière-plan
                         profileViewModel.loadUserPosts()
                     }
                 )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },
                     onLogoutClick = {
-                        // Redirection vers l'écran de login/auth
-                        // popUpTo(0) permet d'effacer tout l'historique pour éviter de revenir en arrière
                         navController.navigate("login") {
                             popUpTo(0)
                         }

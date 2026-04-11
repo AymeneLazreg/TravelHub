@@ -10,7 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect // <-- IMPORTANT
+import androidx.compose.runtime.DisposableEffect // Changement ici
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,13 +31,16 @@ fun NotificationsScreen(
     onBackClick: () -> Unit,
     viewModel: NotificationViewModel = viewModel()
 ) {
-    // --- DÉCLENCHEUR : MARQUER COMME LU À L'OUVERTURE ---
-    LaunchedEffect(Unit) {
-        viewModel.markAllAsRead()
-    }
-
     val notifications = viewModel.notifications
     val isLoading = viewModel.isLoading
+
+    // --- LOGIQUE DE LECTURE AU DÉPART ---
+    DisposableEffect(Unit) {
+        onDispose {
+            // Cette ligne s'exécute uniquement quand l'utilisateur quitte l'écran
+            viewModel.markAllAsRead()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -89,11 +92,15 @@ fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
         else -> "a interagi avec vous."
     }
 
+    // Le style reste en gras tant que 'read' est false
+    val backgroundColor = if (notification.read) Color.White else Color(0xFFF0F7FF)
+    val fontWeight = if (notification.read) FontWeight.Normal else FontWeight.Bold
+    val textColor = if (notification.read) Color.DarkGray else Color.Black
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Optionnel : Fond légèrement bleuté si non lu pour le contraste
-            .background(if (notification.read) Color.White else Color(0xFFF7F9FB))
+            .background(backgroundColor)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -110,7 +117,8 @@ fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
             Text(
                 text = "${notification.fromUsername} $message",
                 fontSize = 14.sp,
-                fontWeight = if (notification.read) FontWeight.Normal else FontWeight.Bold
+                fontWeight = fontWeight,
+                color = textColor
             )
             Text(
                 text = getRelativeTime(notification.timestamp),

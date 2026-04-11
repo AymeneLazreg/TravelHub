@@ -1,5 +1,6 @@
 package com.example.travelhub.features.travelshare.viewmodel
 
+import android.util.Log
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.travelhub.features.travelshare.model.Notification
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -17,60 +19,90 @@ class NotificationViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    private var notificationListener: ListenerRegistration? = null
+
     var notifications by mutableStateOf<List<Notification>>(emptyList())
         private set
 
     var isLoading by mutableStateOf(true)
         private set
 
-    // Vérifie en temps réel s'il y a des notifs non lues
     val hasUnread by derivedStateOf { notifications.any { !it.read } }
 
     init {
-        fetchNotifications()
+        refreshNotifications()
     }
 
-    private fun fetchNotifications() {
-        val userId = auth.currentUser?.uid ?: return
+    fun refreshNotifications() {
+        notificationListener?.remove()
 
-        firestore.collection("notifications")
+        // On ne vide pas forcément la liste ici si on veut éviter un flash blanc,
+        // mais pour un changement de compte, c'est obligatoire :
+        notifications = emptyList()
+        isLoading = true
+
+        val userId = auth.currentUser?.uid ?: run {
+            isLoading = false
+            return
+        }
+
+        notificationListener = firestore.collection("notifications")
             .whereEqualTo("toUserId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
+                isLoading = false
                 if (e != null) {
-                    isLoading = false
+                    Log.e("NotificationViewModel", "Erreur écoute: ${e.message}")
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    notifications = snapshot.toObjects(Notification::class.java)
+                    // Utilisation de toList() pour forcer la recomposition Compose
+                    val newNotifs = snapshot.toObjects(Notification::class.java).toList()
+                    notifications = newNotifs
+                    Log.d("NotificationViewModel", "Notifs reçues: ${newNotifs.size}")
                 }
-                isLoading = false
             }
     }
 
     fun markAllAsRead() {
+        // On récupère uniquement celles qui sont réellement non lues dans l'état actuel
         val unreadNotifications = notifications.filter { !it.read }
-        if (unreadNotifications.isEmpty()) return
 
-        // MISE À JOUR LOCALE : On force l'UI à changer tout de suite
-        notifications = notifications.map { it.copy(read = true) }
+        if (unreadNotifications.isEmpty()) {
+            Log.d("NotificationViewModel", "Rien à marquer comme lu")
+            return
+        }
 
-        // MISE À JOUR FIREBASE
         viewModelScope.launch {
             try {
+                // MISE À JOUR LOCALE immédiate pour que l'UI réagisse au bout des X secondes du délai
+                notifications = notifications.map { it.copy(read = true) }
+
                 val batch = firestore.batch()
                 unreadNotifications.forEach { notification ->
                     val ref = firestore.collection("notifications").document(notification.id)
                     batch.update(ref, "read", true)
                 }
                 batch.commit().await()
+                Log.d("NotificationViewModel", "Batch de lecture réussi")
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("NotificationViewModel", "Erreur markAsRead: ${e.message}")
             }
         }
     }
 
     fun deleteNotification(notificationId: String) {
-        firestore.collection("notifications").document(notificationId).delete()
+        viewModelScope.launch {
+            try {
+                firestore.collection("notifications").document(notificationId).delete().await()
+            } catch (e: Exception) {
+                Log.e("NotificationViewModel", "Erreur suppression: ${e.message}")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        notificationListener?.remove()
     }
 }

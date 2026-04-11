@@ -44,16 +44,35 @@ class ProfileViewModel : ViewModel() {
         private set
 
     init {
+        refreshAllData()
+    }
+
+    /**
+     * Nettoie les données actuelles et recharge tout pour l'utilisateur
+     * qui vient de se connecter.
+     */
+    fun refreshAllData() {
+        isLoading = true
+        // Important : on vide pour ne pas afficher brièvement les données du compte précédent
+        userProfile = UserProfile()
+        userPosts = emptyList()
+        favoritePosts = emptyList()
+
         loadUserProfile()
         loadUserPosts()
     }
 
     // --- CHARGEMENT DU PROFIL (TEMPS RÉEL) ---
     private fun loadUserProfile() {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = auth.currentUser?.uid ?: run {
+            isLoading = false
+            return
+        }
+
         firestore.collection("users").document(userId)
             .addSnapshotListener { document, error ->
                 if (error != null) {
+                    Log.e("ProfileViewModel", "Erreur Profil: ${error.message}")
                     isLoading = false
                     return@addSnapshotListener
                 }
@@ -61,7 +80,6 @@ class ProfileViewModel : ViewModel() {
                     val profile = document.toObject(UserProfile::class.java)
                     if (profile != null) {
                         userProfile = profile
-                        // Met à jour la liste des posts favoris dès que les IDs changent
                         loadFavoritePosts(profile.favorites)
                     }
                 }
@@ -71,22 +89,26 @@ class ProfileViewModel : ViewModel() {
 
     // --- CHARGEMENT DES POSTS DE L'UTILISATEUR ---
     fun loadUserPosts() {
-        val userId = auth.currentUser?.uid ?: return
+        val userId = auth.currentUser?.uid ?: run {
+            isLoading = false
+            return
+        }
 
         firestore.collection("posts")
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
+                // Dès qu'on reçoit une réponse (même erreur d'index), on arrête le chargement
+                isLoading = false
+
                 if (e != null) {
                     Log.e("ProfileViewModel", "Erreur écoute: ${e.message}")
                     return@addSnapshotListener
                 }
 
                 if (snapshot != null) {
-                    // .toList() est CRUCIAL ici : il crée une nouvelle instance de liste.
-                    // Sans ça, Compose peut croire que la liste est la même et ne pas rafraîchir.
                     userPosts = snapshot.toObjects(Post::class.java).toList()
-                    Log.d("ProfileViewModel", "Profil synchronisé : ${userPosts.size} posts")
+                    Log.d("ProfileViewModel", "Posts synchronisés pour $userId : ${userPosts.size}")
                 }
             }
     }
@@ -106,7 +128,7 @@ class ProfileViewModel : ViewModel() {
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    favoritePosts = snapshot.toObjects(Post::class.java)
+                    favoritePosts = snapshot.toObjects(Post::class.java).toList()
                 }
             }
     }
@@ -152,8 +174,6 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun removePostLocally(postId: String) {
-        // On filtre la liste actuelle pour enlever le post supprimé
-        // Cela force Compose à redessiner la grille SANS le post
         userPosts = userPosts.filter { it.id != postId }
     }
 }
