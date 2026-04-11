@@ -159,4 +159,27 @@ class PostViewModel : ViewModel() {
             } catch (e: Exception) { _isUploading.value = false }
         }
     }
+
+    fun deletePost(post: Post) {
+        viewModelScope.launch {
+            try {
+                // 1. Supprimer l'image du Storage
+                val imageRef = storage.getReferenceFromUrl(post.imageUrl)
+                imageRef.delete().await()
+                // 2. Supprimer le document Firestore
+                firestore.collection("posts").document(post.id).delete().await()
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
+
+    fun reportPost(post: Post) {
+        viewModelScope.launch {
+            val report = hashMapOf(
+                "postId" to post.id,
+                "reportedBy" to auth.currentUser?.uid,
+                "timestamp" to com.google.firebase.Timestamp.now()
+            )
+            firestore.collection("reports").add(report)
+        }
+    }
 }

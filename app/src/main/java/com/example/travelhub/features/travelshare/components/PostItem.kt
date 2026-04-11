@@ -1,15 +1,14 @@
 package com.example.travelhub.features.travelshare.components
 
+import androidx.compose.foundation.background // IMPORT MANQUANT CORRIGÉ
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.outlined.MailOutline // Utilise une icône de message
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,16 +20,24 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
+import java.util.*
 
 @Composable
 fun PostItem(
     post: Post,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
-    onShowLikers: () -> Unit
+    onShowLikers: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onReportClick: () -> Unit
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val isLiked = post.likedBy.contains(currentUserId)
+
+    // Cette ligne ne sera plus rouge car la fonction est ajoutée en bas
+    val relativeTime = getRelativeTime(post.timestamp.toDate())
+
+    var showMenu by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
@@ -38,7 +45,7 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column {
-            // Header: User Info
+            // --- HEADER ---
             Row(
                 modifier = Modifier.padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -49,13 +56,54 @@ fun PostItem(
                     modifier = Modifier.size(40.dp).clip(CircleShape)
                 )
                 Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(post.username, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(post.username, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("• $relativeTime", fontSize = 11.sp, color = Color.Gray)
+                    }
                     Text(post.locationName, fontSize = 12.sp, color = Color.Gray)
+                }
+
+                // --- BOUTON 3 POINTS ---
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreHoriz, contentDescription = "Options")
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        if (post.userId == currentUserId) {
+                            DropdownMenuItem(
+                                text = { Text("Supprimer", color = Color.Red) },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
+                                onClick = {
+                                    showMenu = false
+                                    onDeleteClick()
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text("Enregistrer") },
+                                leadingIcon = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
+                                onClick = { showMenu = false }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Signaler", color = Color.Red) },
+                                leadingIcon = { Icon(Icons.Default.Report, contentDescription = null, tint = Color.Red) },
+                                onClick = {
+                                    showMenu = false
+                                    onReportClick()
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
-            // Post Image
+            // --- IMAGE ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -63,34 +111,50 @@ fun PostItem(
                 contentScale = ContentScale.Crop
             )
 
-            // Actions: Like & Comment
-            Row(modifier = Modifier.padding(8.dp)) {
-                IconButton(onClick = onLikeClick) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isLiked) Color.Red else Color.Black
+            // --- ACTIONS (LIKE & COMMENT) ---
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onLikeClick) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isLiked) Color.Red else Color.Black
+                        )
+                    }
+                    Text(
+                        text = "${post.likesCount}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { onShowLikers() }
                     )
                 }
-                IconButton(onClick = onCommentClick) {
-                    Icon(Icons.Outlined.MailOutline, contentDescription = null)
+
+                Spacer(modifier = Modifier.width(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onCommentClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.ModeComment,
+                            contentDescription = "Commentaires",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Text(
+                        text = "${post.comments.size}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
 
-            // Likes Count & Description
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text(
-                    "${post.likesCount} j'aime",
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onShowLikers() }
-                )
-                Text(
-                    text = post.description,
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-
-                // Affichage des tags
+            // --- DESCRIPTION ---
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                Text(text = post.description, fontSize = 14.sp)
                 if (post.tags.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = post.tags.joinToString(" ") { "#$it" },
                         color = Color(0xFF007AFF),
@@ -98,7 +162,26 @@ fun PostItem(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
         }
+    }
+}
+
+// --- FONCTION UTILITAIRE  ---
+fun getRelativeTime(date: Date): String {
+    val now = Date().time
+    val diff = now - date.time
+
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+    val weeks = days / 7
+
+    return when {
+        seconds < 60 -> "maintenant"
+        minutes < 60 -> "${minutes}min"
+        hours < 24 -> "${hours}h"
+        days < 7 -> "${days}j"
+        else -> "${weeks}s"
     }
 }

@@ -15,7 +15,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-// On importe nos composants et dialogues
 import com.example.travelhub.features.travelshare.components.PostItem
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
@@ -56,7 +55,10 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
-                            }
+                            },
+                            // AJOUT DES NOUVELLES ACTIONS ICI
+                            onDeleteClick = { viewModel.deletePost(post) },
+                            onReportClick = { viewModel.reportPost(post) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -71,7 +73,6 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
             onDismissRequest = { showCommentsSheet = false },
             containerColor = Color.White
         ) {
-            // On appelle ton composant Comments que l'on a créé au début !
             Comments(post = selectedPost, viewModel = viewModel)
         }
     }
@@ -83,7 +84,6 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
             onDismissRequest = { showLikersSheet = false },
             containerColor = Color.White
         ) {
-            // Liste des gens qui ont liké
             Likes(likers = likers)
         }
     }
