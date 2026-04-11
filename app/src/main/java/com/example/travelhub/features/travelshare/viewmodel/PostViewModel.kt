@@ -100,7 +100,31 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- COMMENTAIRES (FONCTIONS MANQUANTES AJOUTÉES ICI) ---
+    // --- FAVORIS (SYSTÈME D'ENREGISTREMENT) ---
+    fun toggleFavorite(postId: String) {
+        val currentUser = auth.currentUser ?: return
+        val userRef = firestore.collection("users").document(currentUser.uid)
+
+        viewModelScope.launch {
+            try {
+                val snapshot = userRef.get().await()
+                // On récupère la liste actuelle des favoris de l'utilisateur
+                val favorites = snapshot.get("favorites") as? List<String> ?: emptyList()
+
+                if (favorites.contains(postId)) {
+                    // Si déjà présent, on le retire
+                    userRef.update("favorites", FieldValue.arrayRemove(postId)).await()
+                } else {
+                    // Sinon, on l'ajoute
+                    userRef.update("favorites", FieldValue.arrayUnion(postId)).await()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    // --- COMMENTAIRES ---
     fun addComment(postId: String, text: String) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
@@ -163,10 +187,8 @@ class PostViewModel : ViewModel() {
     fun deletePost(post: Post) {
         viewModelScope.launch {
             try {
-                // 1. Supprimer l'image du Storage
                 val imageRef = storage.getReferenceFromUrl(post.imageUrl)
                 imageRef.delete().await()
-                // 2. Supprimer le document Firestore
                 firestore.collection("posts").document(post.id).delete().await()
             } catch (e: Exception) { e.printStackTrace() }
         }

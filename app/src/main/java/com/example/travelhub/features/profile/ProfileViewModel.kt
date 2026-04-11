@@ -9,6 +9,7 @@ import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.storage.FirebaseStorage
 
 data class UserProfile(
@@ -18,7 +19,8 @@ data class UserProfile(
     val bio: String = "",
     val location: String = "",
     val photoUrl: String = "",
-    val interests: List<String> = emptyList()
+    val interests: List<String> = emptyList(),
+    val favorites: List<String> = emptyList() // Ajout du champ favoris
 )
 
 class ProfileViewModel : ViewModel() {
@@ -32,8 +34,11 @@ class ProfileViewModel : ViewModel() {
     var isLoading by mutableStateOf(true)
         private set
 
-    // --- NOUVEAU : Liste des posts réels de l'utilisateur ---
     var userPosts by mutableStateOf<List<Post>>(emptyList())
+        private set
+
+    // --- NOUVEAU : Liste des posts favoris réels ---
+    var favoritePosts by mutableStateOf<List<Post>>(emptyList())
         private set
 
     init {
@@ -42,32 +47,29 @@ class ProfileViewModel : ViewModel() {
     }
 
     private fun loadUserProfile() {
-        val userId = auth.currentUser?.uid
-        if (userId != null) {
-            isLoading = true
-            firestore.collection("users").document(userId)
-                .addSnapshotListener { document, error ->
-                    if (error != null) {
-                        isLoading = false
-                        return@addSnapshotListener
-                    }
-                    if (document != null && document.exists()) {
-                        userProfile = UserProfile(
-                            nom = document.getString("nom") ?: "",
-                            prenom = document.getString("prenom") ?: "",
-                            username = document.getString("username") ?: "",
-                            bio = document.getString("bio") ?: "",
-                            location = document.getString("location") ?: "",
-                            photoUrl = document.getString("photoUrl") ?: "",
-                            interests = (document.get("interests") as? List<String>) ?: emptyList()
-                        )
-                    }
-                    isLoading = false
+        val userId = auth.currentUser?.uid ?: return
+        firestore.collection("users").document(userId)
+            .addSnapshotListener { document, error ->
+                if (error != null) return@addSnapshotListener
+                if (document != null && document.exists()) {
+                    val favs = (document.get("favorites") as? List<String>) ?: emptyList()
+                    userProfile = UserProfile(
+                        nom = document.getString("nom") ?: "",
+                        prenom = document.getString("prenom") ?: "",
+                        username = document.getString("username") ?: "",
+                        bio = document.getString("bio") ?: "",
+                        location = document.getString("location") ?: "",
+                        photoUrl = document.getString("photoUrl") ?: "",
+                        interests = (document.get("interests") as? List<String>) ?: emptyList(),
+                        favorites = favs
+                    )
+                    // Dès que le profil change, on recharge les favoris réels
+                    loadFavoritePosts(favs)
                 }
-        }
+                isLoading = false
+            }
     }
 
-    // --- NOUVELLE FONCTION : Charger les publications de l'utilisateur ---
     private fun loadUserPosts() {
         val userId = auth.currentUser?.uid ?: return
         firestore.collection("posts")
@@ -75,40 +77,39 @@ class ProfileViewModel : ViewModel() {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) return@addSnapshotListener
-                if (snapshot != null) {
-                    userPosts = snapshot.toObjects(Post::class.java)
-                }
+                userPosts = snapshot?.toObjects(Post::class.java) ?: emptyList()
             }
     }
 
-    fun updateUserProfile(
-        nom: String, prenom: String, username: String, bio: String, location: String,
-        onSuccess: () -> Unit, onError: (String) -> Unit
-    ) {
-        val userId = auth.currentUser?.uid
-        if (userId != null) {
-            val updates = hashMapOf<String, Any>(
-                "nom" to nom, "prenom" to prenom, "username" to username, "bio" to bio, "location" to location
-            )
-            firestore.collection("users").document(userId).update(updates)
-                .addOnSuccessListener { onSuccess() }
-                .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+    // --- NOUVELLE FONCTION : Charger les posts depuis les IDs favoris ---
+    private fun loadFavoritePosts(favoriteIds: List<String>) {
+        if (favoriteIds.isEmpty()) {
+            favoritePosts = emptyList()
+            return
         }
+
+        // Firestore limite whereIn à 10 ou 30 IDs selon la version, suffisant ici
+        firestore.collection("posts")
+            .whereIn(FieldPath.documentId(), favoriteIds)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) return@addSnapshotListener
+                favoritePosts = snapshot?.toObjects(Post::class.java) ?: emptyList()
+            }
+    }
+
+    fun updateUserProfile(nom: String, prenom: String, username: String, bio: String, location: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        val userId = auth.currentUser?.uid ?: return
+        val updates = hashMapOf<String, Any>("nom" to nom, "prenom" to prenom, "username" to username, "bio" to bio, "location" to location)
+        firestore.collection("users").document(userId).update(updates).addOnSuccessListener { onSuccess() }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
     }
 
     fun uploadProfileImage(uri: Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val userId = auth.currentUser?.uid ?: return
         val storageRef = storage.reference.child("profile_images/$userId.jpg")
-
-        storageRef.putFile(uri)
-            .addOnSuccessListener {
-                storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
-                    firestore.collection("users").document(userId)
-                        .update("photoUrl", downloadUrl.toString())
-                        .addOnSuccessListener { onSuccess() }
-                        .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
-                }
+        storageRef.putFile(uri).addOnSuccessListener {
+            storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
+                firestore.collection("users").document(userId).update("photoUrl", downloadUrl.toString()).addOnSuccessListener { onSuccess() }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
             }
-            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+        }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
     }
 }

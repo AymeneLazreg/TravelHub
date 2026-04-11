@@ -1,6 +1,6 @@
 package com.example.travelhub.features.travelshare.components
 
-import androidx.compose.foundation.background // IMPORT MANQUANT CORRIGÉ
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -29,12 +29,11 @@ fun PostItem(
     onCommentClick: () -> Unit,
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
-    onReportClick: () -> Unit
+    onReportClick: () -> Unit,
+    onFavoriteClick: () -> Unit // <-- AJOUTÉ : Action pour les favoris
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val isLiked = post.likedBy.contains(currentUserId)
-
-    // Cette ligne ne sera plus rouge car la fonction est ajoutée en bas
     val relativeTime = getRelativeTime(post.timestamp.toDate())
 
     var showMenu by remember { mutableStateOf(false) }
@@ -85,10 +84,14 @@ fun PostItem(
                                 }
                             )
                         } else {
+                            // OPTION FAVORIS (Remplace Enregistrer)
                             DropdownMenuItem(
-                                text = { Text("Enregistrer") },
-                                leadingIcon = { Icon(Icons.Default.BookmarkBorder, contentDescription = null) },
-                                onClick = { showMenu = false }
+                                text = { Text("Ajouter aux favoris") },
+                                leadingIcon = { Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700)) },
+                                onClick = {
+                                    showMenu = false
+                                    onFavoriteClick() // Déclenche l'ajout en base
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text("Signaler", color = Color.Red) },

@@ -56,9 +56,10 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
                             },
-                            // AJOUT DES NOUVELLES ACTIONS ICI
                             onDeleteClick = { viewModel.deletePost(post) },
-                            onReportClick = { viewModel.reportPost(post) }
+                            onReportClick = { viewModel.reportPost(post) },
+                            // --- AJOUT DE L'ACTION FAVORIS ICI ---
+                            onFavoriteClick = { viewModel.toggleFavorite(post.id) }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
