@@ -15,12 +15,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+// --- IMPORTS CRITIQUES ---
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+// Ajoute cet import pour collectAsState :
+import androidx.compose.runtime.collectAsState
+// --------------------------
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-// VÉRIFIE BIEN CES IMPORTS :
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import androidx.compose.ui.draw.clip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +48,8 @@ fun AddPostScreen(
     var expandedMenu by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
-    // Utilisation de collectAsState pour observer le chargement
+
+    // Correction ici : collectAsState() nécessite l'import mentionné plus haut
     val isUploading by viewModel.isUploading.collectAsState()
 
     val availableTags = listOf("Nature", "Sunset", "Greece", "City", "Museum")
@@ -93,7 +96,7 @@ fun AddPostScreen(
                 AsyncImage(
                     model = selectedImageUri,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop
                 )
             }
@@ -143,9 +146,9 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (isUploading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(color = Color.Black)
             } else {
                 Button(
                     onClick = { expandedMenu = true },
@@ -162,8 +165,7 @@ fun AddPostScreen(
 
             DropdownMenu(
                 expanded = expandedMenu,
-                onDismissRequest = { expandedMenu = false },
-                modifier = Modifier.fillMaxWidth(0.8f)
+                onDismissRequest = { expandedMenu = false }
             ) {
                 DropdownMenuItem(
                     text = { Text("Publier en public") },
