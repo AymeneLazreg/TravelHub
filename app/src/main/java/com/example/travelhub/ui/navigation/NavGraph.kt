@@ -9,6 +9,7 @@ import com.example.travelhub.features.auth.RegisterScreen
 import com.example.travelhub.features.main.MainScreen
 import com.example.travelhub.features.profile.EditProfileScreen
 import com.example.travelhub.features.travelpath.TravelPathPreferencesScreen
+import com.example.travelhub.features.travelshare.NotificationsScreen // N'oublie pas l'import !
 
 @Composable
 fun NavGraph() {
@@ -44,11 +45,17 @@ fun NavGraph() {
             )
         }
 
-        // --- NOUVELLE ROUTE POUR L'ÉDITION DU PROFIL ---
         composable("edit_profile") {
             EditProfileScreen(
-                onBackClick = { navController.popBackStack() }, // Ferme via la flèche
-                onSaveClick = { navController.popBackStack() }  // Ferme après la sauvegarde
+                onBackClick = { navController.popBackStack() },
+                onSaveClick = { navController.popBackStack() }
+            )
+        }
+
+        // --- AJOUT DE LA ROUTE NOTIFICATIONS ICI ---
+        composable("notifications") {
+            NotificationsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

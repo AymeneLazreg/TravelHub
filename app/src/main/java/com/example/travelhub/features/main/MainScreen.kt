@@ -54,11 +54,18 @@ fun MainScreen(navController: NavController) {
             contentAlignment = Alignment.Center
         ) {
             when (currentRoute) {
-                "accueil" -> HomeScreen()
+                "accueil" -> HomeScreen(
+                    onNotificationsClick = {
+                        // Action de navigation vers l'écran de notifications
+                        navController.navigate("notifications")
+                    }
+                )
                 "recherche" -> SearchScreen()
-                "ajout" -> AddPostScreen()
+                "ajout" -> AddPostScreen(
+                    onPostSuccess = { currentRoute = "accueil" }
+                )
                 "profil" -> ProfileScreen(
-                    onEditClick = { navController.navigate("edit_profile") } // <-- DÉCLENCHE LA NAVIGATION ICI
+                    onEditClick = { navController.navigate("edit_profile") }
                 )
                 "voyager" -> TravelPathScreen(
                     onNewSearchClick = { navController.navigate("travel_preferences") }

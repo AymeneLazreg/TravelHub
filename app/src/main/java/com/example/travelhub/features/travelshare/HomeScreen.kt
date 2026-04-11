@@ -4,8 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -16,17 +19,16 @@ import com.example.travelhub.features.travelshare.components.PostItem
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-import com.example.travelhub.features.profile.ProfileViewModel // Import du ProfileViewModel
+import com.example.travelhub.features.profile.ProfileViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: PostViewModel = viewModel(),
-    profileViewModel: ProfileViewModel = viewModel() // Ajout du ViewModel de profil
+    profileViewModel: ProfileViewModel = viewModel(),
+    onNotificationsClick: () -> Unit // Ajout de la navigation vers les notifications
 ) {
     val posts by viewModel.posts.collectAsState()
-
-    // On observe le profil utilisateur pour connaître ses favoris
     val userProfile = profileViewModel.userProfile
 
     // États pour contrôler l'affichage des fenêtres surgissantes
@@ -34,27 +36,44 @@ fun HomeScreen(
     var showCommentsSheet by remember { mutableStateOf(false) }
     var selectedPostId by remember { mutableStateOf<String?>(null) }
 
-    // On récupère le post sélectionné pour l'afficher dans la Sheet de commentaires
     val selectedPost = posts.find { it.id == selectedPostId }
 
     Scaffold { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-                Text(
-                    "TravelShare",
-                    modifier = Modifier.padding(16.dp),
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+
+                // --- BARRE SUPÉRIEURE (HEADER) ---
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "TravelShare",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // ICÔNE NOTIFICATIONS
+                    IconButton(onClick = onNotificationsClick) {
+                        Icon(
+                            imageVector = Icons.Outlined.Notifications,
+                            contentDescription = "Notifications",
+                            modifier = Modifier.size(28.dp),
+                            tint = Color.Black
+                        )
+                    }
+                }
 
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(posts) { post ->
-                        // VERIFICATION : Le post actuel est-il dans la liste des favoris ?
                         val isFavorite = userProfile.favorites.contains(post.id)
 
                         PostItem(
                             post = post,
-                            isFavorite = isFavorite, // On passe l'état au composant
+                            isFavorite = isFavorite,
                             onLikeClick = { viewModel.toggleLike(post) },
                             onCommentClick = {
                                 selectedPostId = post.id
