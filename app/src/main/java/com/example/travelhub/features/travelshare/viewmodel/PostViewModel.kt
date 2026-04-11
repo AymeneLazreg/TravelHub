@@ -30,7 +30,6 @@ class PostViewModel : ViewModel() {
     private val _likersDetails = MutableStateFlow<List<UserProfile>>(emptyList())
     val likersDetails: StateFlow<List<UserProfile>> = _likersDetails
 
-    // --- RE-AJOUT DE L'ÉTAT DE CHARGEMENT ---
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading
 
@@ -48,30 +47,24 @@ class PostViewModel : ViewModel() {
             }
     }
 
-    // --- RE-AJOUT DE LA FONCTION UPLOAD ---
     fun uploadPost(imageUri: Uri, description: String, location: String, tags: List<String>, onComplete: () -> Unit) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             _isUploading.value = true
             try {
-                // 1. Upload de l'image sur Firebase Storage
                 val fileName = "posts/${UUID.randomUUID()}.jpg"
                 val storageRef = storage.reference.child(fileName)
                 storageRef.putFile(imageUri).await()
                 val downloadUrl = storageRef.downloadUrl.await()
 
-                // 2. Récupération infos user
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
-                val username = userDoc.getString("username") ?: "Aventurier"
-                val userProfileUrl = userDoc.getString("photoUrl") ?: ""
 
-                // 3. Création du post dans Firestore
                 val postId = firestore.collection("posts").document().id
                 val newPost = Post(
                     id = postId,
                     userId = currentUser.uid,
-                    username = username,
-                    userProfileUrl = userProfileUrl,
+                    username = userDoc.getString("username") ?: "Aventurier",
+                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
                     imageUrl = downloadUrl.toString(),
                     description = description,
                     locationName = location,
@@ -79,12 +72,40 @@ class PostViewModel : ViewModel() {
                 )
 
                 firestore.collection("posts").document(postId).set(newPost).await()
-
                 _isUploading.value = false
                 onComplete()
             } catch (e: Exception) {
                 e.printStackTrace()
                 _isUploading.value = false
+            }
+        }
+    }
+
+    fun addComment(postId: String, text: String) {
+        val currentUser = auth.currentUser ?: return
+        viewModelScope.launch {
+            try {
+                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
+
+                val newComment = Comment(
+                    userId = currentUser.uid,
+                    username = userDoc.getString("username") ?: "Aventurier",
+                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
+                    text = text,
+                    timestamp = com.google.firebase.Timestamp.now()
+                )
+
+                // ON ENVOIE JUSTE À FIREBASE
+                // Le "addSnapshotListener" dans fetchPosts s'occupera de l'afficher tout seul
+                firestore.collection("posts").document(postId)
+                    .update("comments", FieldValue.arrayUnion(newComment))
+                    .await()
+
+                // SUPPRIME la ligne _posts.value = _posts.value.map { ... }
+                // C'est elle qui créait le doublon visuel.
+
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -106,20 +127,16 @@ class PostViewModel : ViewModel() {
             .addOnSuccessListener { snapshot -> _likersDetails.value = snapshot.toObjects(UserProfile::class.java) }
     }
 
-    fun addComment(postId: String, text: String) {
-        val currentUser = auth.currentUser ?: return
+    fun deleteComment(postId: String, comment: Comment) {
         viewModelScope.launch {
             try {
-                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
-                val newComment = Comment(
-                    userId = currentUser.uid,
-                    username = userDoc.getString("username") ?: "Aventurier",
-                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
-                    text = text
-                )
                 firestore.collection("posts").document(postId)
-                    .update("comments", FieldValue.arrayUnion(newComment)).await()
-            } catch (e: Exception) { e.printStackTrace() }
+                    .update("comments", FieldValue.arrayRemove(comment))
+                    .await()
+                // Le snapshotListener fera le reste pour mettre à jour l'UI
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }

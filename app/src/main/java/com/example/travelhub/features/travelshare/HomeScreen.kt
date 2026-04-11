@@ -24,7 +24,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.profile.UserProfile
 import com.example.travelhub.features.travelshare.model.Post
-// Importation de tes nouveaux composants
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
@@ -38,16 +37,11 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
 
     var showLikersSheet by remember { mutableStateOf(false) }
     var showCommentsSheet by remember { mutableStateOf(false) }
-    var selectedPost by remember { mutableStateOf<Post?>(null) }
+    var selectedPostId by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            Text(
-                text = "TravelShare",
-                modifier = Modifier.padding(16.dp),
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("TravelShare", modifier = Modifier.padding(16.dp), fontSize = 24.sp, fontWeight = FontWeight.Bold)
 
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(posts) { post ->
@@ -55,12 +49,12 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
                         post = post,
                         viewModel = viewModel,
                         onLikesClick = {
-                            selectedPost = post
+                            selectedPostId = post.id
                             viewModel.fetchLikersDetails(post.likedBy)
                             showLikersSheet = true
                         },
                         onCommentsClick = {
-                            selectedPost = post
+                            selectedPostId = post.id
                             showCommentsSheet = true
                         }
                     )
@@ -69,29 +63,26 @@ fun HomeScreen(viewModel: PostViewModel = viewModel()) {
             }
         }
 
-        // --- SHEET LIKES (Composant externe) ---
         if (showLikersSheet) {
             ModalBottomSheet(onDismissRequest = { showLikersSheet = false }) {
                 Likes(likers = likers)
             }
         }
 
-        // --- SHEET COMMENTAIRES (Composant externe) ---
-        if (showCommentsSheet && selectedPost != null) {
+        if (showCommentsSheet && selectedPostId != null) {
             ModalBottomSheet(onDismissRequest = { showCommentsSheet = false }) {
-                Comments(post = selectedPost!!, viewModel = viewModel)
+                // SOLUTION : On cherche le post en direct dans la liste du ViewModel
+                val livePost = posts.find { it.id == selectedPostId }
+                livePost?.let {
+                    Comments(post = it, viewModel = viewModel)
+                }
             }
         }
     }
 }
 
 @Composable
-fun PostItem(
-    post: Post,
-    viewModel: PostViewModel,
-    onLikesClick: () -> Unit,
-    onCommentsClick: () -> Unit
-) {
+fun PostItem(post: Post, viewModel: PostViewModel, onLikesClick: () -> Unit, onCommentsClick: () -> Unit) {
     val currentUser = FirebaseAuth.getInstance().currentUser
     val isLiked = post.likedBy.contains(currentUser?.uid)
 
@@ -103,54 +94,29 @@ fun PostItem(
                 modifier = Modifier.size(40.dp).clip(CircleShape).background(Color.LightGray),
                 contentScale = ContentScale.Crop
             )
-            Text(
-                text = post.username,
-                modifier = Modifier.padding(start = 8.dp),
-                fontWeight = FontWeight.Bold
-            )
+            Text(post.username, modifier = Modifier.padding(start = 8.dp), fontWeight = FontWeight.Bold)
         }
 
         AsyncImage(
             model = post.imageUrl,
             contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-                .padding(vertical = 8.dp)
-                .clip(RoundedCornerShape(12.dp)),
+            modifier = Modifier.fillMaxWidth().height(300.dp).padding(vertical = 8.dp).clip(RoundedCornerShape(12.dp)),
             contentScale = ContentScale.Crop
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { viewModel.toggleLike(post) }) {
-                Icon(
-                    imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = null,
-                    tint = if (isLiked) Color.Red else Color.Black
-                )
+                Icon(if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = null, tint = if (isLiked) Color.Red else Color.Black)
             }
-            Text(
-                text = "${post.likesCount} likes",
-                modifier = Modifier.clickable { onLikesClick() },
-                fontWeight = FontWeight.Bold
-            )
-
+            Text("${post.likesCount} likes", modifier = Modifier.clickable { onLikesClick() }, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.width(16.dp))
-
             IconButton(onClick = onCommentsClick) {
-                Icon(imageVector = Icons.Outlined.ChatBubbleOutline, contentDescription = null)
+                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null)
             }
-            Text(
-                text = "${post.comments.size}",
-                modifier = Modifier.clickable { onCommentsClick() },
-                fontWeight = FontWeight.Bold
-            )
+            Text("${post.comments.size}", modifier = Modifier.clickable { onCommentsClick() }, fontWeight = FontWeight.Bold)
         }
-
         if (post.description.isNotBlank()) {
-            Text(text = post.description, modifier = Modifier.padding(top = 4.dp))
+            Text(post.description, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
-
-// Note: LikerRow a été déplacé dans Likes.kt ou peut être supprimé si déjà intégré au composant Likes.

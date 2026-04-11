@@ -1,6 +1,8 @@
 package com.example.travelhub.features.travelshare.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,35 +24,40 @@ import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.model.Comment
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun Comments(post: Post, viewModel: PostViewModel) {
     var commentText by remember { mutableStateOf("") }
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .padding(bottom = 32.dp)
-            .navigationBarsPadding()
-    ) {
+    // État pour la suppression
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var commentToDelete by remember { mutableStateOf<Comment?>(null) }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp).padding(bottom = 32.dp).navigationBarsPadding()) {
         Text("Commentaires", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f, fill = false)) {
             if (post.comments.isEmpty()) {
-                item { Text("Aucun commentaire. Soyez le premier !", color = Color.Gray, fontSize = 14.sp) }
+                item { Text("Aucun commentaire.", color = Color.Gray, fontSize = 14.sp) }
             } else {
                 items(post.comments) { comment ->
-                    CommentRow(comment)
+                    CommentRow(
+                        comment = comment,
+                        isMyComment = comment.userId == currentUserId,
+                        onLongPress = {
+                            commentToDelete = comment
+                            showDeleteDialog = true
+                        }
+                    )
                 }
             }
         }
 
+        // Zone de saisie (inchangée)
         Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = Color(0xFFF0F0F0))
-        Spacer(modifier = Modifier.height(12.dp))
-
         Row(modifier = Modifier.fillMaxWidth().imePadding(), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = commentText,
@@ -75,11 +82,39 @@ fun Comments(post: Post, viewModel: PostViewModel) {
             }
         }
     }
+
+    // Dialogue de confirmation
+    if (showDeleteDialog && commentToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Supprimer ?") },
+            text = { Text("Voulez-vous supprimer ce commentaire ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteComment(post.id, commentToDelete!!)
+                    showDeleteDialog = false
+                }) { Text("Supprimer", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("Annuler") }
+            }
+        )
+    }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CommentRow(comment: Comment) {
-    Row(modifier = Modifier.padding(bottom = 16.dp), verticalAlignment = Alignment.Top) {
+fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { },
+                onLongClick = { if (isMyComment) onLongPress() } // On n'active le clic long que si c'est le nôtre
+            )
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.Top
+    ) {
         AsyncImage(
             model = comment.userProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${comment.username}" },
             contentDescription = null,
@@ -91,11 +126,9 @@ fun CommentRow(comment: Comment) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(comment.username, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = formatTimestamp(comment.timestamp.seconds * 1000),
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )            }
+                // Conversion Timestamp vers Long pour formatTimestamp
+                Text(formatTimestamp(comment.timestamp.seconds * 1000), fontSize = 12.sp, color = Color.Gray)
+            }
             Text(comment.text, fontSize = 14.sp, color = Color.DarkGray)
         }
     }
