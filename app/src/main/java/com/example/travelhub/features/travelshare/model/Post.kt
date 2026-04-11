@@ -18,6 +18,7 @@ data class Post(
     val imageUrl: String = "",
     val description: String = "",
     val locationName: String = "",
+    val category: String = "",
     val tags: List<String> = emptyList(),
     val timestamp: Timestamp = Timestamp.now(),
     val likesCount: Int = 0,

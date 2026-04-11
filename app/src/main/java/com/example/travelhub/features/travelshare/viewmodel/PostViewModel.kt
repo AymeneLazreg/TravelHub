@@ -12,8 +12,7 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.UUID
@@ -27,15 +26,30 @@ class PostViewModel : ViewModel() {
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts
 
+    // --- RECHERCHE ---
+    private val _searchQuery = MutableStateFlow("")
+    private val _selectedCategory = MutableStateFlow<String?>(null)
+
+    val filteredPosts: StateFlow<List<Post>> = combine(_posts, _searchQuery, _selectedCategory) { posts, query, category ->
+        posts.filter { post ->
+            val matchesQuery = query.isBlank() ||
+                    post.description.contains(query, ignoreCase = true) ||
+                    post.locationName.contains(query, ignoreCase = true) ||
+                    post.username.contains(query, ignoreCase = true) ||
+                    post.tags.any { it.contains(query, ignoreCase = true) }
+
+            val matchesCategory = category == null || post.category == category
+            matchesQuery && matchesCategory
+        }
+    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
     private val _likersDetails = MutableStateFlow<List<UserProfile>>(emptyList())
     val likersDetails: StateFlow<List<UserProfile>> = _likersDetails
 
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading
 
-    init {
-        fetchPosts()
-    }
+    init { fetchPosts() }
 
     private fun fetchPosts() {
         firestore.collection("posts")
@@ -47,7 +61,10 @@ class PostViewModel : ViewModel() {
             }
     }
 
-    fun uploadPost(imageUri: Uri, description: String, location: String, tags: List<String>, onComplete: () -> Unit) {
+    fun onSearchQueryChanged(newQuery: String) { _searchQuery.value = newQuery }
+    fun onCategorySelected(category: String?) { _selectedCategory.value = category }
+
+    fun uploadPost(imageUri: Uri, description: String, location: String, category: String, tags: List<String>, onComplete: () -> Unit) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             _isUploading.value = true
@@ -68,6 +85,7 @@ class PostViewModel : ViewModel() {
                     imageUrl = downloadUrl.toString(),
                     description = description,
                     locationName = location,
+                    category = category,
                     tags = tags
                 )
 
@@ -75,7 +93,6 @@ class PostViewModel : ViewModel() {
                 _isUploading.value = false
                 onComplete()
             } catch (e: Exception) {
-                e.printStackTrace()
                 _isUploading.value = false
             }
         }
@@ -86,7 +103,6 @@ class PostViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
-
                 val newComment = Comment(
                     userId = currentUser.uid,
                     username = userDoc.getString("username") ?: "Aventurier",
@@ -94,19 +110,18 @@ class PostViewModel : ViewModel() {
                     text = text,
                     timestamp = com.google.firebase.Timestamp.now()
                 )
-
-                // ON ENVOIE JUSTE À FIREBASE
-                // Le "addSnapshotListener" dans fetchPosts s'occupera de l'afficher tout seul
                 firestore.collection("posts").document(postId)
-                    .update("comments", FieldValue.arrayUnion(newComment))
-                    .await()
+                    .update("comments", FieldValue.arrayUnion(newComment)).await()
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
 
-                // SUPPRIME la ligne _posts.value = _posts.value.map { ... }
-                // C'est elle qui créait le doublon visuel.
-
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    fun deleteComment(postId: String, comment: Comment) {
+        viewModelScope.launch {
+            try {
+                firestore.collection("posts").document(postId)
+                    .update("comments", FieldValue.arrayRemove(comment)).await()
+            } catch (e: Exception) { e.printStackTrace() }
         }
     }
 
@@ -122,21 +137,7 @@ class PostViewModel : ViewModel() {
 
     fun fetchLikersDetails(userIds: List<String>) {
         if (userIds.isEmpty()) { _likersDetails.value = emptyList(); return }
-        _likersDetails.value = emptyList()
         firestore.collection("users").whereIn(FieldPath.documentId(), userIds).get()
             .addOnSuccessListener { snapshot -> _likersDetails.value = snapshot.toObjects(UserProfile::class.java) }
-    }
-
-    fun deleteComment(postId: String, comment: Comment) {
-        viewModelScope.launch {
-            try {
-                firestore.collection("posts").document(postId)
-                    .update("comments", FieldValue.arrayRemove(comment))
-                    .await()
-                // Le snapshotListener fera le reste pour mettre à jour l'UI
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
     }
 }

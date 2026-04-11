@@ -17,14 +17,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-// --- IMPORTS CRITIQUES ---
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-// Ajoute cet import pour collectAsState :
 import androidx.compose.runtime.collectAsState
-// --------------------------
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -33,9 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-import androidx.compose.ui.draw.clip
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPostScreen(
@@ -47,12 +44,14 @@ fun AddPostScreen(
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var expandedMenu by remember { mutableStateOf(false) }
 
-    val context = LocalContext.current
+    // --- Catégorie (Choix unique) ---
+    val categories = listOf("Nature", "Musée", "Rue", "Magasin", "Restaurant")
+    var selectedCategory by remember { mutableStateOf("") }
 
-    // Correction ici : collectAsState() nécessite l'import mentionné plus haut
+    val context = LocalContext.current
     val isUploading by viewModel.isUploading.collectAsState()
 
-    val availableTags = listOf("Nature", "Sunset", "Greece", "City", "Museum")
+    val availableTags = listOf("Coucher de soleil", "Architecture", "Calme", "Gratuit", "Hiver")
     val selectedTags = remember { mutableStateListOf<String>() }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -74,6 +73,7 @@ fun AddPostScreen(
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
+        // Zone d'upload Photo
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -104,6 +104,7 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        // Location
         Text("Location", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = location,
@@ -115,19 +116,40 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Description
         Text("Description", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = description,
             onValueChange = { description = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp),
+            modifier = Modifier.fillMaxWidth().height(120.dp),
             shape = RoundedCornerShape(8.dp),
             maxLines = 5
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Section Type de lieu (Catégories - Choix Unique)
+        Text("Catégorie", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(categories) { category ->
+                FilterChip(
+                    selected = selectedCategory == category,
+                    onClick = { selectedCategory = category },
+                    label = { Text(category) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFE3F2FD),
+                        selectedLabelColor = Color(0xFF1976D2)
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Section Tags (Détails - Choix Multiples)
         Text("Tags", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
@@ -146,16 +168,15 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Bouton de publication
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (isUploading) {
                 CircularProgressIndicator(color = Color.Black)
             } else {
                 Button(
                     onClick = { expandedMenu = true },
-                    enabled = selectedImageUri != null && description.isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(55.dp),
+                    enabled = selectedImageUri != null && description.isNotBlank() && selectedCategory.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().height(55.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121))
                 ) {
@@ -163,16 +184,19 @@ fun AddPostScreen(
                 }
             }
 
-            DropdownMenu(
-                expanded = expandedMenu,
-                onDismissRequest = { expandedMenu = false }
-            ) {
+            DropdownMenu(expanded = expandedMenu, onDismissRequest = { expandedMenu = false }) {
                 DropdownMenuItem(
                     text = { Text("Publier en public") },
                     onClick = {
                         expandedMenu = false
                         selectedImageUri?.let { uri ->
-                            viewModel.uploadPost(uri, description, location, selectedTags.toList()) {
+                            viewModel.uploadPost(
+                                imageUri = uri,
+                                description = description,
+                                location = location,
+                                category = selectedCategory,
+                                tags = selectedTags.toList()
+                            ) {
                                 Toast.makeText(context, "Post publié !", Toast.LENGTH_LONG).show()
                                 onPostSuccess()
                             }
