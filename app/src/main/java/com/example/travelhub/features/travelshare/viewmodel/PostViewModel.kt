@@ -3,11 +3,12 @@ package com.example.travelhub.features.travelshare.viewmodel
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.travelhub.features.profile.UserProfile
 import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.FieldValue // On importe la classe parente
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +28,10 @@ class PostViewModel : ViewModel() {
     private val _isUploading = MutableStateFlow(false)
     val isUploading: StateFlow<Boolean> = _isUploading
 
+    // --- NOUVEAU : Détails des gens qui ont liké ---
+    private val _likersDetails = MutableStateFlow<List<UserProfile>>(emptyList())
+    val likersDetails: StateFlow<List<UserProfile>> = _likersDetails
+
     init {
         fetchPosts()
     }
@@ -41,9 +46,23 @@ class PostViewModel : ViewModel() {
             }
     }
 
+    fun fetchLikersDetails(userIds: List<String>) {
+        if (userIds.isEmpty()) {
+            _likersDetails.value = emptyList()
+            return
+        }
+        // Récupère les profils dont l'ID est dans la liste likedBy
+        firestore.collection("users")
+            .whereIn(com.google.firebase.firestore.FieldPath.documentId(), userIds)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val users = snapshot.toObjects(UserProfile::class.java)
+                _likersDetails.value = users
+            }
+    }
+
     fun uploadPost(imageUri: Uri, description: String, location: String, tags: List<String>, onComplete: () -> Unit) {
         val currentUser = auth.currentUser ?: return
-
         viewModelScope.launch {
             _isUploading.value = true
             try {
@@ -65,13 +84,9 @@ class PostViewModel : ViewModel() {
                     imageUrl = downloadUrl.toString(),
                     description = description,
                     locationName = location,
-                    tags = tags,
-                    likesCount = 0,
-                    likedBy = emptyList()
+                    tags = tags
                 )
-
                 firestore.collection("posts").document(postId).set(newPost).await()
-
                 _isUploading.value = false
                 onComplete()
             } catch (e: Exception) {
@@ -85,13 +100,11 @@ class PostViewModel : ViewModel() {
         val postRef = firestore.collection("posts").document(post.id)
 
         if (post.likedBy.contains(currentUser.uid)) {
-            // L'utilisateur a déjà liké -> On retire le like
             postRef.update(
                 "likesCount", FieldValue.increment(-1L),
                 "likedBy", FieldValue.arrayRemove(currentUser.uid)
             )
         } else {
-            // L'utilisateur n'a pas encore liké -> On ajoute le like (Union évite les doublons)
             postRef.update(
                 "likesCount", FieldValue.increment(1L),
                 "likedBy", FieldValue.arrayUnion(currentUser.uid)
