@@ -1,6 +1,7 @@
 package com.example.travelhub.features.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,19 +24,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import com.example.travelhub.features.travelshare.components.PostDetailDialog
+import com.example.travelhub.features.travelshare.model.Post
+import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+
 @Composable
 fun ProfileScreen(
     onEditClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel(),
+    postViewModel: PostViewModel = viewModel() // Ajouté pour gérer les actions du PostDetailDialog
 ) {
     val userProfile = profileViewModel.userProfile
     val isLoading = profileViewModel.isLoading
     val userPosts = profileViewModel.userPosts
     val favoritePosts = profileViewModel.favoritePosts
 
-    // État pour savoir quel onglet est sélectionné (0 pour Posts, 1 pour Favoris)
+    // État pour savoir quel onglet est sélectionné
     var selectedTabIndex by remember { mutableIntStateOf(0) }
+
+    // ÉTAT POUR LE POST SÉLECTIONNÉ (DÉTAIL)
+    var selectedPostForDetail by remember { mutableStateOf<Post?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         if (isLoading) {
@@ -56,7 +65,6 @@ fun ProfileScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                         ProfileStat(count = userPosts.size.toString(), label = "Posts")
-                        // Compteur dynamique des favoris
                         ProfileStat(count = userProfile.favorites.size.toString(), label = "Favoris")
                     }
                 }
@@ -101,7 +109,7 @@ fun ProfileScreen(
                 )
             }
 
-            // --- AFFICHAGE DE LA GRILLE SELON L'ONGLET ---
+            // --- AFFICHAGE DE LA GRILLE ---
             val currentGridPosts = if (selectedTabIndex == 0) userPosts else favoritePosts
 
             if (currentGridPosts.isEmpty()) {
@@ -121,13 +129,34 @@ fun ProfileScreen(
                         AsyncImage(
                             model = post.imageUrl,
                             contentDescription = null,
-                            modifier = Modifier.aspectRatio(1f).padding(1.dp).clip(RoundedCornerShape(2.dp)),
+                            modifier = Modifier
+                                .aspectRatio(1f)
+                                .padding(1.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .clickable { selectedPostForDetail = post }, // CLIC POUR OUVRIR LE DÉTAIL
                             contentScale = ContentScale.Crop
                         )
                     }
                 }
             }
         }
+    }
+
+    // --- DIALOGUE DE DÉTAIL (Affiche le post complet au clic) ---
+    selectedPostForDetail?.let { post ->
+        PostDetailDialog(
+            post = post,
+            onDismiss = { selectedPostForDetail = null },
+            onLikeClick = { postViewModel.toggleLike(post) },
+            onCommentClick = { /* Optionnel : naviguer vers commentaires */ },
+            onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
+            onDeleteClick = {
+                postViewModel.deletePost(post)
+                selectedPostForDetail = null
+            },
+            onReportClick = { postViewModel.reportPost(post) },
+            onFavoriteClick = { postViewModel.toggleFavorite(post.id) }
+        )
     }
 }
 
