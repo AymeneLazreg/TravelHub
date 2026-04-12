@@ -79,18 +79,22 @@ fun NavGraph() {
             )
         }
 
-        // --- NOTIFICATIONS (MODIFIÉ) ---
         composable("notifications") {
-            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-
             NotificationsScreen(
                 onBackClick = { navController.popBackStack() },
                 viewModel = notificationViewModel,
                 onUserClick = { userId ->
-                    // Si on clique sur soi-même dans les notifs, on ne fait rien
-                    // ou on redirige vers son propre profil si besoin.
-                    if (userId != currentUserId) {
-                        navController.navigate("other_profile/$userId")
+                    navController.navigate("other_profile/$userId")
+                },
+                onNotificationContentClick = { notification ->
+                    // 1. On prépare le ViewModel avant de changer d'écran
+                    postViewModel.selectedPostIdFromNotif = notification.postId
+                    postViewModel.shouldOpenCommentsFromNotif = (notification.type == "COMMENT")
+
+                    // 2. On redirige vers l'accueil
+                    navController.navigate("home") {
+                        // On vide la pile pour que "Home" soit l'écran principal
+                        popUpTo("home") { inclusive = true }
                     }
                 }
             )

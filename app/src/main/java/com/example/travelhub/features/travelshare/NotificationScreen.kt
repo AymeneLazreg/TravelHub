@@ -30,12 +30,14 @@ import com.example.travelhub.utils.getRelativeTime
 @Composable
 fun NotificationsScreen(
     onBackClick: () -> Unit,
-    onUserClick: (String) -> Unit, // --- AJOUT DU PARAMÈTRE ICI ---
+    onUserClick: (String) -> Unit,
+    onNotificationContentClick: (Notification) -> Unit, // Reçu du NavGraph
     viewModel: NotificationViewModel = viewModel()
 ) {
     val notifications = viewModel.notifications
     val isLoading = viewModel.isLoading
 
+    // Marquer comme lu quand on quitte l'écran
     DisposableEffect(Unit) {
         onDispose {
             viewModel.markAllAsRead()
@@ -69,10 +71,10 @@ fun NotificationsScreen(
                     items(notifications) { notification ->
                         NotificationItem(
                             notification = notification,
-                            onAvatarClick = { onUserClick(notification.fromUserId) }, // --- REDIRECTION PROFIL ---
+                            onAvatarClick = { onUserClick(notification.fromUserId) },
                             onContentClick = {
-                                // On garde cette zone pour ta future logique vers le post/commentaire
-                                println("Clic sur le contenu de la notif : ${notification.id}")
+                                // ICI : On appelle enfin la fonction de navigation !
+                                onNotificationContentClick(notification)
                             }
                         )
                         HorizontalDivider(
@@ -90,8 +92,8 @@ fun NotificationsScreen(
 @Composable
 fun NotificationItem(
     notification: Notification,
-    onAvatarClick: () -> Unit, // --- NOUVEAU ---
-    onContentClick: () -> Unit  // --- NOUVEAU ---
+    onAvatarClick: () -> Unit,
+    onContentClick: () -> Unit
 ) {
     val message = when (notification.type) {
         "LIKE" -> "a aimé votre publication."
@@ -111,24 +113,24 @@ fun NotificationItem(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // --- ZONE 1 : AVATAR (DIRECTION PROFIL) ---
+        // --- PHOTO DE L'EXPÉDITEUR (Clic -> Profil) ---
         AsyncImage(
             model = notification.fromUserProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${notification.fromUsername}" },
             contentDescription = null,
             modifier = Modifier
                 .size(45.dp)
                 .clip(CircleShape)
-                .clickable { onAvatarClick() }, // Uniquement la photo mène au profil
+                .clickable { onAvatarClick() },
             contentScale = ContentScale.Crop
         )
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // --- ZONE 2 : TEXTE (DIRECTION CONTENU) ---
+        // --- TEXTE DE LA NOTIF (Clic -> Post/Commentaire) ---
         Column(
             modifier = Modifier
                 .weight(1f)
-                .clickable { onContentClick() } // Le texte mènera au post plus tard
+                .clickable { onContentClick() }
         ) {
             Text(
                 text = "${notification.fromUsername} $message",
@@ -145,14 +147,14 @@ fun NotificationItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        // --- ZONE 3 : MINIATURE POST (DIRECTION CONTENU) ---
+        // --- MINIATURE DU POST (Clic -> Post/Commentaire) ---
         AsyncImage(
             model = notification.postImageUrl,
             contentDescription = null,
             modifier = Modifier
                 .size(45.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .clickable { onContentClick() }, // La petite photo du post mène aussi au post
+                .clickable { onContentClick() },
             contentScale = ContentScale.Crop
         )
     }

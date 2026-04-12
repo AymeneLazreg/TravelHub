@@ -17,9 +17,11 @@ import androidx.compose.ui.unit.sp
 import com.example.travelhub.features.travelshare.components.PostItem
 import com.example.travelhub.features.travelshare.components.Comments
 import com.example.travelhub.features.travelshare.components.Likes
+import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.profile.ProfileViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,17 +30,33 @@ fun HomeScreen(
     profileViewModel: ProfileViewModel,
     notificationViewModel: NotificationViewModel,
     onNotificationsClick: () -> Unit,
-    onUserClick: (String) -> Unit // Ton paramètre est bien là
+    onUserClick: (String) -> Unit
 ) {
     val posts by viewModel.posts.collectAsState()
     val userProfile = profileViewModel.userProfile
-    val hasUnread = notificationViewModel.hasUnread
+    val hasUnread by remember { derivedStateOf { notificationViewModel.hasUnread } }
 
     var showLikersSheet by remember { mutableStateOf(false) }
     var showCommentsSheet by remember { mutableStateOf(false) }
     var selectedPostId by remember { mutableStateOf<String?>(null) }
 
     val selectedPost = posts.find { it.id == selectedPostId }
+
+    // --- LOGIQUE DE NAVIGATION DEPUIS LES NOTIFICATIONS (MODIFIÉE) ---
+    LaunchedEffect(viewModel.selectedPostIdFromNotif) {
+        val postIdFromNotif = viewModel.selectedPostIdFromNotif
+        if (postIdFromNotif != null) {
+            selectedPostId = postIdFromNotif
+
+            // On attend un court instant pour laisser le PostDetailDialog s'initialiser
+            // et lire le flag "shouldOpenCommentsFromNotif" avant de le clear
+            if (viewModel.shouldOpenCommentsFromNotif) {
+                delay(600) // Un peu plus que le delay du Dialog pour être sûr
+            }
+
+            viewModel.clearNavigationRequest()
+        }
+    }
 
     Scaffold { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
@@ -70,7 +88,7 @@ fun HomeScreen(
 
                 // --- LISTE DES POSTS ---
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(posts) { post ->
+                    items(posts, key = { it.id }) { post ->
                         val isFavorite = userProfile.favorites.contains(post.id)
                         PostItem(
                             post = post,
@@ -80,11 +98,11 @@ fun HomeScreen(
                                 selectedPostId = post.id
                                 showCommentsSheet = true
                             },
-                            // SI TU VEUX CLIQUER SUR L'AUTEUR DU POST :
                             onUserClick = onUserClick,
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
+                                selectedPostId = post.id
                             },
                             onDeleteClick = {
                                 viewModel.deletePost(post)
@@ -106,12 +124,7 @@ fun HomeScreen(
             onDismissRequest = { showCommentsSheet = false },
             containerColor = Color.White
         ) {
-            // C'EST ICI QU'IL MANQUAIT LE PARAMÈTRE (Ligne 115)
-            Comments(
-                post = selectedPost,
-                viewModel = viewModel,
-                onUserClick = onUserClick // On transmet la callback ici !
-            )
+            Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)
         }
     }
 
@@ -121,15 +134,34 @@ fun HomeScreen(
             onDismissRequest = { showLikersSheet = false },
             containerColor = Color.White
         ) {
-            // OPTIMISATION : On permet aussi de cliquer sur les profils dans la liste des Likes
-            Likes(
-                likers = likers,
-                onUserClick = { userId ->
-                    showLikersSheet = false // On ferme la sheet avant de naviguer
-                    onUserClick(userId)
-                }
-            )
+            Likes(likers = likers, onUserClick = { userId ->
+                showLikersSheet = false
+                onUserClick(userId)
+            })
         }
     }
 
+    // --- DIALOGUE PLEIN ÉCRAN ---
+    if (selectedPost != null && !showCommentsSheet && !showLikersSheet) {
+        PostDetailDialog(
+            post = selectedPost,
+            isFavorite = userProfile.favorites.contains(selectedPost.id),
+            viewModel = viewModel, // Passage du ViewModel essentiel pour le flag
+            onDismiss = { selectedPostId = null },
+            onLikeClick = { viewModel.toggleLike(selectedPost) },
+            onCommentClick = { showCommentsSheet = true },
+            onUserClick = onUserClick,
+            onShowLikers = {
+                viewModel.fetchLikersDetails(selectedPost.likedBy)
+                showLikersSheet = true
+            },
+            onDeleteClick = {
+                viewModel.deletePost(selectedPost)
+                profileViewModel.loadUserPosts()
+                selectedPostId = null
+            },
+            onReportClick = { viewModel.reportPost(selectedPost) },
+            onFavoriteClick = { viewModel.toggleFavorite(selectedPost.id) }
+        )
+    }
 }

@@ -44,7 +44,6 @@ fun OtherProfileScreen(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var selectedPostForDetail by remember { mutableStateOf<Post?>(null) }
 
-    // On utilise statusBarsPadding() pour ne pas coller en haut de l'écran
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -166,6 +165,7 @@ fun OtherProfileScreen(
         PostDetailDialog(
             post = post,
             isFavorite = userProfile.favorites.contains(post.id),
+            viewModel = postViewModel, // <--- AJOUTÉ ICI POUR RÉGLER L'ERREUR
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { },

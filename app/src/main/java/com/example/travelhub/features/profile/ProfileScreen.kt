@@ -172,6 +172,7 @@ fun ProfileScreen(
         PostDetailDialog(
             post = post,
             isFavorite = isFavorite,
+            viewModel = postViewModel,
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { /* Action gérée dans le Dialog */ },

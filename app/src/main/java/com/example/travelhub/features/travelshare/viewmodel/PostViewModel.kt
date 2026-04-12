@@ -22,6 +22,9 @@ import java.util.Locale
 import java.util.Date
 import android.util.Log
 import kotlinx.coroutines.tasks.await
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 
 class PostViewModel : ViewModel() {
 
@@ -35,6 +38,18 @@ class PostViewModel : ViewModel() {
     private val _searchQuery = MutableStateFlow("")
     private val _selectedCategory = MutableStateFlow<String?>(null)
     private val _selectedDate = MutableStateFlow<Long?>(null)
+
+    // --- ÉTATS POUR LA NAVIGATION DEPUIS LES NOTIFS ---
+    var selectedPostIdFromNotif by mutableStateOf<String?>(null)
+
+    // On précise bien <Boolean> pour que Kotlin sache que c'est vrai/faux
+    var shouldOpenCommentsFromNotif by mutableStateOf<Boolean>(false)
+
+    // Fonction pour réinitialiser après l'ouverture
+    fun clearNavigationRequest() {
+        selectedPostIdFromNotif = null
+        shouldOpenCommentsFromNotif = false
+    }
 
     val filteredPosts: StateFlow<List<Post>> = combine(
         _posts, _searchQuery, _selectedCategory, _selectedDate
