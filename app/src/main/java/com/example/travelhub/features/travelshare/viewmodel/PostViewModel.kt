@@ -273,4 +273,16 @@ class PostViewModel : ViewModel() {
             } catch (e: Exception) { e.printStackTrace() }
         }
     }
+
+    fun getSimilarPosts(currentPost: Post): List<Post> {
+        val allPosts = _posts.value
+        val currentTags = currentPost.tags // Liste de tags (ex: ["Nature", "Montagne"])
+
+        return allPosts.filter { post ->
+            // On exclut le post actuel de la liste des résultats
+            post.id != currentPost.id &&
+                    // On vérifie s'il y a au moins un tag en commun
+                    post.tags.any { tag -> currentTags.contains(tag) }
+        }
+    }
 }

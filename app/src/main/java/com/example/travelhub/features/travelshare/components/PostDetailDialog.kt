@@ -1,19 +1,28 @@
 package com.example.travelhub.features.travelshare.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-import androidx.compose.ui.text.font.FontWeight
-// Assure-toi que cet import est présent pour le composant Comments
-import com.example.travelhub.features.travelshare.components.Comments
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,13 +39,11 @@ fun PostDetailDialog(
     onReportClick: () -> Unit,
     onFavoriteClick: () -> Unit
 ) {
-    // 1. État local pour gérer l'affichage de la sheet des commentaires
     var showInternalComments by remember { mutableStateOf(false) }
 
-    // 2. LOGIQUE D'AUTO-OUVERTURE (Déclenchée à l'ouverture du dialogue)
+    // Logique d'auto-ouverture pour les notifications de commentaires [cite: 37, 42]
     LaunchedEffect(key1 = viewModel.shouldOpenCommentsFromNotif) {
         if (viewModel.shouldOpenCommentsFromNotif) {
-            // Un léger délai permet au Dialog de se stabiliser avant d'ouvrir la sheet
             kotlinx.coroutines.delay(100)
             showInternalComments = true
         }
@@ -44,7 +51,7 @@ fun PostDetailDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false) // Plein écran
+        properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Scaffold(
             topBar = {
@@ -59,30 +66,70 @@ fun PostDetailDialog(
                 )
             }
         ) { padding ->
-            Box(modifier = Modifier.padding(padding)) {
+            // Utilisation d'une Column scrollable pour voir les photos similaires en bas
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // 1. Le Post principal
                 PostItem(
                     post = post,
                     isFavorite = isFavorite,
                     onLikeClick = onLikeClick,
-                    onCommentClick = {
-                        // Ouvre la sheet interne quand on clique sur l'icône commentaire
-                        showInternalComments = true
-                    },
+                    onCommentClick = { showInternalComments = true },
                     onUserClick = onUserClick,
                     onShowLikers = onShowLikers,
                     onDeleteClick = onDeleteClick,
                     onReportClick = onReportClick,
                     onFavoriteClick = onFavoriteClick
                 )
+
+                // 2. Section Recherche par similarité
+                val similarPosts = remember(post) { viewModel.getSimilarPosts(post) }
+
+                if (similarPosts.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+
+                    Text(
+                        text = "Photos similaires",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(similarPosts) { similarPost ->
+                            AsyncImage(
+                                model = similarPost.imageUrl,
+                                contentDescription = "Photo similaire",
+                                modifier = Modifier
+                                    .width(120.dp)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        // On peut imaginer naviguer vers ce post ici
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
 
-        // 3. LA SHEET DES COMMENTAIRES (S'affiche par-dessus le PostDetailDialog)
         if (showInternalComments) {
             ModalBottomSheet(
                 onDismissRequest = { showInternalComments = false },
                 containerColor = Color.White
-                // On a supprimé la ligne windowInsets qui faisait l'erreur
             ) {
                 Comments(
                     post = post,
