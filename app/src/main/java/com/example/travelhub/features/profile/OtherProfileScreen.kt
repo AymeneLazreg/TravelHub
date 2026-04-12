@@ -7,11 +7,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -27,19 +26,21 @@ import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-import com.google.firebase.auth.FirebaseAuth
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(
-    onEditClick: () -> Unit,
-    onLogoutClick: () -> Unit,
-    profileViewModel: ProfileViewModel,
+fun OtherProfileScreen(
+    userId: String,
+    viewModel: OtherProfileViewModel,
     postViewModel: PostViewModel,
-    onUserClick: (String) -> Unit
+    onBackClick: () -> Unit
 ) {
-    val userProfile = profileViewModel.userProfile
-    val isLoading = profileViewModel.isLoading
+    LaunchedEffect(userId) {
+        viewModel.loadUser(userId)
+    }
 
+    val userProfile = viewModel.userProfile
+    val isLoading = viewModel.isLoading
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var selectedPostForDetail by remember { mutableStateOf<Post?>(null) }
 
@@ -49,26 +50,17 @@ fun ProfileScreen(
                 CircularProgressIndicator(color = Color.Black)
             }
         } else {
-            // --- HEADER DU PROFIL ---
-            Column(modifier = Modifier.padding(top = 24.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
-
+            // --- HEADER IDENTIQUE ---
+            Column(modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
+                // Barre du haut avec retour
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-
-                    IconButton(onClick = {
-                        FirebaseAuth.getInstance().signOut()
-                        onLogoutClick()
-                    }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = "Déconnexion",
-                            tint = Color.Black
-                        )
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                     }
+                    Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Row(
@@ -84,16 +76,13 @@ fun ProfileScreen(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Box(
-                            modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
                         }
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                        ProfileStat(count = profileViewModel.userPosts.size.toString(), label = "Posts")
+                        ProfileStat(count = viewModel.userPosts.size.toString(), label = "Posts")
                         ProfileStat(count = userProfile.favorites.size.toString(), label = "Favoris")
                     }
                 }
@@ -101,27 +90,14 @@ fun ProfileScreen(
                 Text(text = "${userProfile.prenom} ${userProfile.nom}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(text = userProfile.bio, fontSize = 14.sp)
 
-                // LA LIGNE PARASITE A ÉTÉ SUPPRIMÉE ICI
-
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Icon(Icons.Default.LocationOn, modifier = Modifier.size(16.dp), contentDescription = null, tint = Color.Gray)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(text = userProfile.location, color = Color.Gray, fontSize = 14.sp)
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Button(
-                    onClick = onEditClick,
-                    modifier = Modifier.fillMaxWidth().height(40.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF5F5F5), contentColor = Color.Black)
-                ) {
-                    Text("Modifier le profil", fontWeight = FontWeight.SemiBold)
-                }
             }
 
-            // --- ONGLETS ---
+            // --- ONGLETS IDENTIQUES ---
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.White,
@@ -133,11 +109,12 @@ fun ProfileScreen(
                     )
                 }
             ) {
-                Tab(selected = selectedTabIndex == 0, onClick = { selectedTabIndex = 0 }, text = { Text("Mes Posts") })
+                Tab(selected = selectedTabIndex == 0, onClick = { selectedTabIndex = 0 }, text = { Text("Ses Posts") })
                 Tab(selected = selectedTabIndex == 1, onClick = { selectedTabIndex = 1 }, text = { Text("Favoris") })
             }
 
-            val currentGridPosts = if (selectedTabIndex == 0) profileViewModel.userPosts else profileViewModel.favoritePosts
+            // --- GRILLE IDENTIQUE ---
+            val currentGridPosts = if (selectedTabIndex == 0) viewModel.userPosts else viewModel.favoritePosts
 
             if (currentGridPosts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp), contentAlignment = Alignment.TopCenter) {
@@ -155,7 +132,6 @@ fun ProfileScreen(
                             modifier = Modifier
                                 .aspectRatio(1f)
                                 .padding(1.dp)
-                                .clip(RoundedCornerShape(2.dp))
                                 .clickable { selectedPostForDetail = post },
                             contentScale = ContentScale.Crop
                         )
@@ -167,31 +143,17 @@ fun ProfileScreen(
 
     // --- DIALOGUE DE DÉTAIL ---
     selectedPostForDetail?.let { post ->
-        val isFavorite = userProfile.favorites.contains(post.id)
-
         PostDetailDialog(
             post = post,
-            isFavorite = isFavorite,
+            isFavorite = userProfile.favorites.contains(post.id),
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
-            onCommentClick = { /* Action gérée dans le Dialog */ },
-            onUserClick = onUserClick, // Cette ligne-là est la bonne !
+            onCommentClick = { },
+            onUserClick = { /* Déjà sur son profil */ },
             onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
-            onDeleteClick = {
-                selectedPostForDetail = null
-                postViewModel.deletePost(post)
-                profileViewModel.removePostLocally(post.id)
-            },
+            onDeleteClick = { /* Impossible */ },
             onReportClick = { postViewModel.reportPost(post) },
             onFavoriteClick = { postViewModel.toggleFavorite(post.id) }
         )
-    }
-}
-
-@Composable
-fun ProfileStat(count: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = count, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(text = label, color = Color.Gray, fontSize = 12.sp)
     }
 }

@@ -11,14 +11,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
-import com.example.travelhub.features.profile.ProfileScreen
 import com.example.travelhub.features.profile.ProfileViewModel
+import com.example.travelhub.features.profile.ProfileScreen
 import com.example.travelhub.features.travelpath.TravelPathScreen
 import com.example.travelhub.features.travelshare.AddPostScreen
 import com.example.travelhub.features.travelshare.HomeScreen
 import com.example.travelhub.features.travelshare.SearchScreen
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth
 
 data class BottomNavItem(
     val name: String,
@@ -33,10 +34,13 @@ fun MainScreen(
     postViewModel: PostViewModel,
     profileViewModel: ProfileViewModel
 ) {
-    // --- INITIALISATION AU CHARGEMENT (LOGIN / RECONNEXION) ---
+    // Récupération de l'ID de l'utilisateur actuel pour la comparaison
+    val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid }
+
+    // --- INITIALISATION AU CHARGEMENT ---
     LaunchedEffect(Unit) {
-        profileViewModel.refreshAllData()              // Nettoie et charge le bon profil
-        notificationViewModel.refreshNotifications()    // Nettoie et charge les bonnes notifications
+        profileViewModel.refreshAllData()
+        notificationViewModel.refreshNotifications()
     }
 
     var currentRoute by remember { mutableStateOf("accueil") }
@@ -70,7 +74,9 @@ fun MainScreen(
         }
     ) { innerPadding ->
         Box(
-            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
             contentAlignment = Alignment.Center
         ) {
             when (currentRoute) {
@@ -80,6 +86,15 @@ fun MainScreen(
                     notificationViewModel = notificationViewModel,
                     onNotificationsClick = {
                         navController.navigate("notifications")
+                    },
+                    onUserClick = { userId ->
+                        // CONDITION : Si c'est mon ID, je vais sur l'onglet profil
+                        if (userId == currentUserId) {
+                            currentRoute = "profil"
+                            profileViewModel.loadUserPosts()
+                        } else {
+                            navController.navigate("other_profile/$userId")
+                        }
                     }
                 )
                 "recherche" -> SearchScreen()
@@ -99,7 +114,13 @@ fun MainScreen(
                         }
                     },
                     profileViewModel = profileViewModel,
-                    postViewModel = postViewModel
+                    postViewModel = postViewModel,
+                    onUserClick = { userId ->
+                        // Si on clique sur soi-même depuis son propre profil, on ne fait rien
+                        if (userId != currentUserId) {
+                            navController.navigate("other_profile/$userId")
+                        }
+                    }
                 )
                 "voyager" -> TravelPathScreen(
                     onNewSearchClick = { navController.navigate("travel_preferences") }

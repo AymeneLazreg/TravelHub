@@ -30,6 +30,7 @@ fun PostItem(
     isFavorite: Boolean,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
+    onUserClick: (String) -> Unit,
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,

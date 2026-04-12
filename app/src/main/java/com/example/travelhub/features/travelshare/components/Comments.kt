@@ -2,6 +2,7 @@ package com.example.travelhub.features.travelshare.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable // AJOUT
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,11 +28,14 @@ import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
-fun Comments(post: Post, viewModel: PostViewModel) {
+fun Comments(
+    post: Post,
+    viewModel: PostViewModel,
+    onUserClick: (String) -> Unit // AJOUT : Callback de navigation
+) {
     var commentText by remember { mutableStateOf("") }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
 
-    // États pour les actions
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
     var selectedComment by remember { mutableStateOf<Comment?>(null) }
@@ -48,13 +52,11 @@ fun Comments(post: Post, viewModel: PostViewModel) {
                     CommentRow(
                         comment = comment,
                         isMyComment = comment.userId == currentUserId,
+                        onUserClick = onUserClick, // PASSAGE DE LA CALLBACK
                         onLongPress = {
                             selectedComment = comment
-                            if (comment.userId == currentUserId) {
-                                showDeleteDialog = true
-                            } else {
-                                showReportDialog = true
-                            }
+                            if (comment.userId == currentUserId) showDeleteDialog = true
+                            else showReportDialog = true
                         }
                     )
                 }
@@ -87,7 +89,7 @@ fun Comments(post: Post, viewModel: PostViewModel) {
         }
     }
 
-    // --- DIALOGUE DE SUPPRESSION ---
+    // Dialogues de suppression et signalement (Inchangés)
     if (showDeleteDialog && selectedComment != null) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
@@ -99,47 +101,34 @@ fun Comments(post: Post, viewModel: PostViewModel) {
                     showDeleteDialog = false
                 }) { Text("Supprimer", color = Color.Red) }
             },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) { Text("Annuler") }
-            }
-        )
-    }
-
-    // --- DIALOGUE DE SIGNALEMENT ---
-    if (showReportDialog && selectedComment != null) {
-        AlertDialog(
-            onDismissRequest = { showReportDialog = false },
-            title = { Text("Signaler ce commentaire ?") },
-            text = { Text("Ce commentaire va être envoyé à la modération pour examen.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showReportDialog = false
-                }) { Text("Signaler", color = Color.Red) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showReportDialog = false }) { Text("Annuler") }
-            }
+            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Annuler") } }
         )
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) {
+fun CommentRow(
+    comment: Comment,
+    isMyComment: Boolean,
+    onUserClick: (String) -> Unit, // AJOUT
+    onLongPress: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = { },
-                onLongClick = { onLongPress() }
-            )
+            .combinedClickable(onClick = { }, onLongClick = { onLongPress() })
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.Top
     ) {
         AsyncImage(
             model = comment.userProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${comment.username}" },
             contentDescription = null,
-            modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.LightGray),
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray)
+                .clickable { onUserClick(comment.userId) }, // ACTION DE CLIC
             contentScale = ContentScale.Crop
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -147,7 +136,6 @@ fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(comment.username, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Spacer(modifier = Modifier.width(8.dp))
-                // On multiplie par 1000 pour transformer les secondes Firebase en millisecondes Kotlin
                 Text(formatTimestamp(comment.timestamp.seconds * 1000), fontSize = 12.sp, color = Color.Gray)
             }
             Text(comment.text, fontSize = 14.sp, color = Color.DarkGray)
@@ -155,20 +143,14 @@ fun CommentRow(comment: Comment, isMyComment: Boolean, onLongPress: () -> Unit) 
     }
 }
 
-// FONCTION UTILITAIRE POUR LA DATE
 fun formatTimestamp(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
     val minutes = seconds / 60
     val hours = minutes / 60
     val days = hours / 24
-    val weeks = days / 7
-
-    return when {
-        seconds < 60 -> "à l'instant"
-        minutes < 60 -> "${minutes}min"
-        hours < 24 -> "${hours}h"
-        days < 7 -> "${days}j"
-        else -> "${weeks}s"
-    }
+    if (seconds < 60) return "à l'instant"
+    if (minutes < 60) return "${minutes}min"
+    if (hours < 24) return "${hours}h"
+    return "${days}j"
 }

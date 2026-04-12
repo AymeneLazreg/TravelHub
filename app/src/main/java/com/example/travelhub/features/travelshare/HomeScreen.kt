@@ -27,9 +27,9 @@ fun HomeScreen(
     viewModel: PostViewModel,
     profileViewModel: ProfileViewModel,
     notificationViewModel: NotificationViewModel,
-    onNotificationsClick: () -> Unit
+    onNotificationsClick: () -> Unit,
+    onUserClick: (String) -> Unit // Ton paramètre est bien là
 ) {
-    // Collecte de l'état des posts
     val posts by viewModel.posts.collectAsState()
     val userProfile = profileViewModel.userProfile
     val hasUnread = notificationViewModel.hasUnread
@@ -46,9 +46,7 @@ fun HomeScreen(
 
                 // --- HEADER ---
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -65,12 +63,7 @@ fun HomeScreen(
                                 }
                             }
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Notifications,
-                                contentDescription = "Notifications",
-                                modifier = Modifier.size(28.dp),
-                                tint = Color.Black
-                            )
+                            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
                         }
                     }
                 }
@@ -87,12 +80,14 @@ fun HomeScreen(
                                 selectedPostId = post.id
                                 showCommentsSheet = true
                             },
+                            // SI TU VEUX CLIQUER SUR L'AUTEUR DU POST :
+                            onUserClick = onUserClick,
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
                             },
                             onDeleteClick = {
-                                viewModel.deletePost(post) // On utilise directement le 'post' de la liste
+                                viewModel.deletePost(post)
                                 profileViewModel.loadUserPosts()
                             },
                             onReportClick = { viewModel.reportPost(post) },
@@ -111,7 +106,12 @@ fun HomeScreen(
             onDismissRequest = { showCommentsSheet = false },
             containerColor = Color.White
         ) {
-            Comments(post = selectedPost, viewModel = viewModel)
+            // C'EST ICI QU'IL MANQUAIT LE PARAMÈTRE (Ligne 115)
+            Comments(
+                post = selectedPost,
+                viewModel = viewModel,
+                onUserClick = onUserClick // On transmet la callback ici !
+            )
         }
     }
 

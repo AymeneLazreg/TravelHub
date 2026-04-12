@@ -15,10 +15,11 @@ import com.example.travelhub.features.travelshare.model.Post
 @Composable
 fun PostDetailDialog(
     post: Post,
-    isFavorite: Boolean, // <-- Ajouté
+    isFavorite: Boolean,
     onDismiss: () -> Unit,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
+    onUserClick: (String) -> Unit, // <--- AJOUTÉ : Pour la navigation vers le profil
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
@@ -32,16 +33,21 @@ fun PostDetailDialog(
             topBar = {
                 TopAppBar(
                     title = { Text("Publication") },
-                    navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null) } }
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Default.Close, null)
+                        }
+                    }
                 )
             }
         ) { padding ->
             Box(modifier = Modifier.padding(padding)) {
                 PostItem(
                     post = post,
-                    isFavorite = isFavorite, // <-- Transmis ici
+                    isFavorite = isFavorite,
                     onLikeClick = onLikeClick,
                     onCommentClick = onCommentClick,
+                    onUserClick = onUserClick, // <--- TRANSMIS ICI : Règle l'erreur de compilation
                     onShowLikers = onShowLikers,
                     onDeleteClick = onDeleteClick,
                     onReportClick = onReportClick,
