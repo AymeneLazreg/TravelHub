@@ -1,109 +1,144 @@
 package com.example.travelhub.features.travelpath
 
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-// Modèle de données pour un itinéraire
-data class Itinerary(
-    val title: String,
-    val price: String,
-    val effort: String,
-    val duration: String,
-    val steps: List<String>
-)
-
-// Fausses données
-val mockItineraries = listOf(
-    Itinerary("Paris Full culture", "~70€", "Faible Effort", "8h", listOf("Musée du Louvre", "Cathédrale Notre-Dame de Paris", "Sainte-Chapelle")),
-    Itinerary("Paris Budget Culture", "~20€", "Moyen Effort", "4h", listOf("Basilique du Sacré-Cœur", "Montmartre", "Jardin des Tuileries")),
-    Itinerary("Paris Culture express", "~20€", "Faible Effort", "2h", listOf("Musée du Louvre (visite rapide / extérieur)", "Pont des Arts", "Cathédrale Notre-Dame..."))
-)
+import coil.compose.AsyncImage
 
 @Composable
-fun TravelPathScreen(onNewSearchClick: () -> Unit) {
-    val context = LocalContext.current
+fun TravelPathScreen(
+    onNewSearchClick: () -> Unit,
+    onItineraryClick: (String) -> Unit,
+    travelPathViewModel: TravelPathViewModel // On reçoit le cerveau partagé !
+) {
+    val itineraries = travelPathViewModel.itineraries
+    val isLoading = travelPathViewModel.isLoading
+    val isSearching = travelPathViewModel.isSearching
+    val currentSearchIds = travelPathViewModel.currentSearchIds // Les ID de la recherche actuelle
+
+    // LOGIQUE DE FILTRAGE PARFAITE :
+    // Si en recherche -> On affiche QUE les itinéraires dont l'ID fait partie de la recherche actuelle
+    // Sinon -> On affiche QUE les favoris
+    val listToDisplay = if (isSearching) {
+        itineraries.filter { it.id in currentSearchIds }
+    } else {
+        itineraries.filter { it.favorite }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             Spacer(modifier = Modifier.height(24.dp))
-            Text("Voyager", fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 16.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                Button(onClick = { }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121)), shape = RoundedCornerShape(20.dp)) {
-                    Text("Planifier")
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                OutlinedButton(onClick = { Toast.makeText(context, "Onglet Favoris à venir", Toast.LENGTH_SHORT).show() }, shape = RoundedCornerShape(20.dp), border = null) {
-                    Text("Favoris", color = Color.Black)
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isSearching) "Résultats" else "Mes Favoris",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (isSearching) {
+                    TextButton(onClick = { travelPathViewModel.resetToFavorites() }) {
+                        Icon(Icons.Default.Favorite, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Voir Favoris")
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+
             Spacer(modifier = Modifier.height(16.dp))
 
-            LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 140.dp)) {
-                items(mockItineraries) { itinerary ->
-                    ItineraryCard(itinerary)
-                    Spacer(modifier = Modifier.height(24.dp))
+            if (isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Color.Black)
+            }
+
+            if (listToDisplay.isEmpty() && !isLoading) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (isSearching) "Aucun résultat." else "Vous n'avez pas encore de favoris.",
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 150.dp)
+            ) {
+                items(items = listToDisplay, key = { it.id }) { itinerary ->
+                    ItineraryCard(
+                        itinerary = itinerary,
+                        onFavoriteClick = { travelPathViewModel.toggleFavorite(itinerary) },
+                        onDeleteClick = { travelPathViewModel.deleteItinerary(itinerary.id) },
+                        onDetailsClick = { onItineraryClick(itinerary.id) }
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color(0xFFF5F5F5))
                 }
             }
         }
 
-        // Le bouton qui va déclencher la navigation
         Button(
             onClick = onNewSearchClick,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121)),
-            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 90.dp)
                 .fillMaxWidth(0.8f)
-                .height(50.dp)
+                .height(50.dp),
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Text("Nouvelle recherche", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Nouvelle recherche", fontWeight = FontWeight.Bold)
         }
     }
 }
 
 @Composable
-fun ItineraryCard(itinerary: Itinerary) {
+fun ItineraryCard(itinerary: Itinerary, onFavoriteClick: () -> Unit, onDeleteClick: () -> Unit, onDetailsClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Box(modifier = Modifier.width(80.dp).height(120.dp).clip(RoundedCornerShape(40.dp)).background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Place, contentDescription = "Image", tint = Color.Gray)
-        }
+        AsyncImage(
+            model = itinerary.imageUrl,
+            contentDescription = null,
+            modifier = Modifier.size(90.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFEEEEEE)),
+            contentScale = ContentScale.Crop
+        )
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = itinerary.title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(text = "${itinerary.price} | ${itinerary.effort} | ${itinerary.duration}", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-            itinerary.steps.forEach { step ->
-                Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(bottom = 4.dp)) {
-                    Text(text = "• ", color = Color.Gray, fontSize = 14.sp)
-                    Text(text = step, color = Color.DarkGray, fontSize = 14.sp, lineHeight = 18.sp)
-                }
+            Text(itinerary.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1)
+            Text("${itinerary.price} • ${itinerary.duration}", fontSize = 12.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(8.dp))
+            itinerary.steps.take(2).forEach {
+                Text("• $it", fontSize = 13.sp, color = Color.DarkGray, maxLines = 1)
+            }
+            TextButton(onClick = onDetailsClick, contentPadding = PaddingValues(0.dp)) {
+                Text("Voir l'itinéraire", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(start = 8.dp)) {
-            Button(onClick = { }, colors = ButtonDefaults.buttonColors(containerColor = Color.Black), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), modifier = Modifier.height(36.dp)) {
-                Text("Enregistrer", fontSize = 12.sp)
+        Column(horizontalAlignment = Alignment.End) {
+            IconButton(onClick = onFavoriteClick) {
+                Icon(
+                    imageVector = if (itinerary.favorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = null,
+                    tint = if (itinerary.favorite) Color.Red else Color.Gray
+                )
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = { }, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), modifier = Modifier.height(36.dp)) {
-                Text("Itinéraire", fontSize = 12.sp, color = Color.Black)
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Default.Delete, null, tint = Color.LightGray, modifier = Modifier.size(20.dp))
             }
         }
     }
