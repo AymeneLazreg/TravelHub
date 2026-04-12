@@ -1,0 +1,161 @@
+package com.example.travelhub.features.travelshare
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.example.travelhub.features.travelshare.model.Notification
+import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
+import com.example.travelhub.utils.getRelativeTime
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NotificationsScreen(
+    onBackClick: () -> Unit,
+    onUserClick: (String) -> Unit,
+    onNotificationContentClick: (Notification) -> Unit, // Reçu du NavGraph
+    viewModel: NotificationViewModel = viewModel()
+) {
+    val notifications = viewModel.notifications
+    val isLoading = viewModel.isLoading
+
+    // Marquer comme lu quand on quitte l'écran
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.markAllAsRead()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Notifications", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(Color.White)) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = Color.Black)
+            } else if (notifications.isEmpty()) {
+                Text(
+                    "Aucune notification pour le moment",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.Gray
+                )
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(notifications) { notification ->
+                        NotificationItem(
+                            notification = notification,
+                            onAvatarClick = { onUserClick(notification.fromUserId) },
+                            onContentClick = {
+                                // ICI : On appelle enfin la fonction de navigation !
+                                onNotificationContentClick(notification)
+                            }
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            thickness = 0.5.dp,
+                            color = Color.LightGray
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NotificationItem(
+    notification: Notification,
+    onAvatarClick: () -> Unit,
+    onContentClick: () -> Unit
+) {
+    val message = when (notification.type) {
+        "LIKE" -> "a aimé votre publication."
+        "COMMENT" -> "a commenté : \"${notification.commentText}\""
+        "FAVORITE" -> "a ajouté votre publication à ses favoris."
+        else -> "a interagi avec vous."
+    }
+
+    val backgroundColor = if (notification.read) Color.White else Color(0xFFF0F7FF)
+    val fontWeight = if (notification.read) FontWeight.Normal else FontWeight.Bold
+    val textColor = if (notification.read) Color.DarkGray else Color.Black
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // --- PHOTO DE L'EXPÉDITEUR (Clic -> Profil) ---
+        AsyncImage(
+            model = notification.fromUserProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${notification.fromUsername}" },
+            contentDescription = null,
+            modifier = Modifier
+                .size(45.dp)
+                .clip(CircleShape)
+                .clickable { onAvatarClick() },
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        // --- TEXTE DE LA NOTIF (Clic -> Post/Commentaire) ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onContentClick() }
+        ) {
+            Text(
+                text = "${notification.fromUsername} $message",
+                fontSize = 14.sp,
+                fontWeight = fontWeight,
+                color = textColor
+            )
+            Text(
+                text = getRelativeTime(notification.timestamp),
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // --- MINIATURE DU POST (Clic -> Post/Commentaire) ---
+        AsyncImage(
+            model = notification.postImageUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(45.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { onContentClick() },
+            contentScale = ContentScale.Crop
+        )
+    }
+}

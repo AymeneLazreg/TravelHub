@@ -3,189 +3,165 @@ package com.example.travelhub.features.travelshare
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
-import com.example.travelhub.features.travelshare.model.Post
+import com.example.travelhub.features.travelshare.components.PostItem
+import com.example.travelhub.features.travelshare.components.Comments
+import com.example.travelhub.features.travelshare.components.Likes
+import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
+import com.example.travelhub.features.profile.ProfileViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: PostViewModel = viewModel()
+    viewModel: PostViewModel,
+    profileViewModel: ProfileViewModel,
+    notificationViewModel: NotificationViewModel,
+    onNotificationsClick: () -> Unit,
+    onUserClick: (String) -> Unit
 ) {
-    // Collecte des posts depuis Firestore via le StateFlow du ViewModel
     val posts by viewModel.posts.collectAsState()
+    val userProfile = profileViewModel.userProfile
+    val hasUnread by remember { derivedStateOf { notificationViewModel.hasUnread } }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-    ) {
-        // --- Barre de recherche (UI de ta maquette) ---
-        OutlinedTextField(
-            value = "",
-            onValueChange = {},
-            placeholder = { Text("Search photos, places, travelers...", color = Color.Gray) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color(0xFFF5F5F5),
-                unfocusedContainerColor = Color(0xFFF5F5F5),
-                focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent
-            )
-        )
+    var showLikersSheet by remember { mutableStateOf(false) }
+    var showCommentsSheet by remember { mutableStateOf(false) }
+    var selectedPostId by remember { mutableStateOf<String?>(null) }
 
-        // --- Filtres de catégories [cite: 16, 32] ---
-        val filters = listOf("All", "Nature", "City", "Beach", "Museum")
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(filters) { filter ->
-                FilterChip(
-                    selected = filter == "All",
-                    onClick = { /* Logique de filtrage à implémenter */ },
-                    label = { Text(filter) },
-                    shape = RoundedCornerShape(16.dp)
-                )
+    val selectedPost = posts.find { it.id == selectedPostId }
+
+    // --- LOGIQUE DE NAVIGATION DEPUIS LES NOTIFICATIONS (MODIFIÉE) ---
+    LaunchedEffect(viewModel.selectedPostIdFromNotif) {
+        val postIdFromNotif = viewModel.selectedPostIdFromNotif
+        if (postIdFromNotif != null) {
+            selectedPostId = postIdFromNotif
+
+            // On attend un court instant pour laisser le PostDetailDialog s'initialiser
+            // et lire le flag "shouldOpenCommentsFromNotif" avant de le clear
+            if (viewModel.shouldOpenCommentsFromNotif) {
+                delay(600) // Un peu plus que le delay du Dialog pour être sûr
             }
+
+            viewModel.clearNavigationRequest()
         }
+    }
 
-        Spacer(modifier = Modifier.height(8.dp))
+    Scaffold { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
 
-        // --- Fil d'actualité dynamique ---
-        if (posts.isEmpty()) {
-            // Affichage pendant le chargement ou si aucun post n'existe
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.Black)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                items(posts) { post ->
-                    PostItem(post = post)
-                    HorizontalDivider(
-                        color = Color(0xFFEEEEEE),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
+                // --- HEADER ---
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("TravelShare", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+
+                    IconButton(onClick = onNotificationsClick) {
+                        BadgedBox(
+                            badge = {
+                                if (hasUnread) {
+                                    Badge(
+                                        containerColor = Color.Red,
+                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
+                        }
+                    }
+                }
+
+                // --- LISTE DES POSTS ---
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(posts, key = { it.id }) { post ->
+                        val isFavorite = userProfile.favorites.contains(post.id)
+                        PostItem(
+                            post = post,
+                            isFavorite = isFavorite,
+                            onLikeClick = { viewModel.toggleLike(post) },
+                            onCommentClick = {
+                                selectedPostId = post.id
+                                showCommentsSheet = true
+                            },
+                            onUserClick = onUserClick,
+                            onShowLikers = {
+                                viewModel.fetchLikersDetails(post.likedBy)
+                                showLikersSheet = true
+                                selectedPostId = post.id
+                            },
+                            onDeleteClick = {
+                                viewModel.deletePost(post)
+                                profileViewModel.loadUserPosts()
+                            },
+                            onReportClick = { viewModel.reportPost(post) },
+                            onFavoriteClick = { viewModel.toggleFavorite(post.id) }
+                        )
+                    }
+                    item { Spacer(modifier = Modifier.height(80.dp)) }
                 }
             }
         }
     }
-}
 
-@Composable
-fun PostItem(post: Post) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        // En-tête : Infos utilisateur et lieu [cite: 14, 24]
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = post.userProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.username}" },
-                contentDescription = "Avatar",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = post.username, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    if (post.locationName.isNotEmpty()) {
-                        Text(text = " - ${post.locationName}", fontSize = 14.sp, color = Color.DarkGray)
-                    }
-                }
-                Text(text = "Recently", fontSize = 12.sp, color = Color.Gray)
-            }
-
-            Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray)
+    // --- BOTTOM SHEETS ---
+    if (showCommentsSheet && selectedPost != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showCommentsSheet = false },
+            containerColor = Color.White
+        ) {
+            Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)
         }
+    }
 
-        Spacer(modifier = Modifier.height(12.dp))
+    if (showLikersSheet) {
+        val likers by viewModel.likersDetails.collectAsState()
+        ModalBottomSheet(
+            onDismissRequest = { showLikersSheet = false },
+            containerColor = Color.White
+        ) {
+            Likes(likers = likers, onUserClick = { userId ->
+                showLikersSheet = false
+                onUserClick(userId)
+            })
+        }
+    }
 
-        // Image principale du voyage chargée depuis Firebase Storage [cite: 11]
-        AsyncImage(
-            model = post.imageUrl,
-            contentDescription = "Travel Photo",
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(280.dp)
-                .clip(RoundedCornerShape(12.dp)),
-            contentScale = ContentScale.Crop
+    // --- DIALOGUE PLEIN ÉCRAN ---
+    if (selectedPost != null && !showCommentsSheet && !showLikersSheet) {
+        PostDetailDialog(
+            post = selectedPost,
+            isFavorite = userProfile.favorites.contains(selectedPost.id),
+            viewModel = viewModel, // Passage du ViewModel essentiel pour le flag
+            onDismiss = { selectedPostId = null },
+            onLikeClick = { viewModel.toggleLike(selectedPost) },
+            onCommentClick = { showCommentsSheet = true },
+            onUserClick = onUserClick,
+            onShowLikers = {
+                viewModel.fetchLikersDetails(selectedPost.likedBy)
+                showLikersSheet = true
+            },
+            onDeleteClick = {
+                viewModel.deletePost(selectedPost)
+                profileViewModel.loadUserPosts()
+                selectedPostId = null
+            },
+            onReportClick = { viewModel.reportPost(selectedPost) },
+            onFavoriteClick = { viewModel.toggleFavorite(selectedPost.id) }
         )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Description du post [cite: 19, 27]
-        if (post.description.isNotEmpty()) {
-            Text(text = post.description, fontSize = 14.sp)
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Barre d'interactions : Like, Commentaires et Localisation [cite: 15, 36, 44]
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Default.FavoriteBorder,
-                contentDescription = "Like",
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(text = "${post.likesCount} likes", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-
-            Spacer(modifier = Modifier.width(16.dp))
-
-            Icon(
-                imageVector = Icons.Default.MailOutline,
-                contentDescription = "Comments",
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(text = "0 comments", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Icon(
-                imageVector = Icons.Default.LocationOn,
-                contentDescription = "Map",
-                tint = Color.DarkGray,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(text = "View Map", fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        }
     }
 }

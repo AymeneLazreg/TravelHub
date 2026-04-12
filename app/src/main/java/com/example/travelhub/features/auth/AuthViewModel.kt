@@ -1,87 +1,102 @@
 package com.example.travelhub.features.auth
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.asLiveData
+import androidx.lifecycle.viewModelScope
+import com.example.travelhub.utils.PrefsManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
-class AuthViewModel : ViewModel() {
+// 1. On change ViewModel par AndroidViewModel(application)
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val auth = FirebaseAuth.getInstance()
     private val firestore = FirebaseFirestore.getInstance()
 
+    // 2. On initialise le PrefsManager avec le context de l'application
+    private val prefsManager = PrefsManager(application)
+
+    // 3. On expose l'email sauvegardé pour que le LoginScreen puisse le lire
+    val savedEmail = prefsManager.getEmail.asLiveData()
+
     /**
-     * Inscription : Vérifie le pseudo, crée le compte Auth, puis sauvegarde dans Firestore
+     * Connexion : Authentifie l'utilisateur ET sauvegarde l'email si réussi
+     */
+    fun loginUser(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        auth.signInWithEmailAndPassword(email, pass)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    // --- NOUVEAU : Sauvegarde de l'identifiant ---
+                    viewModelScope.launch {
+                        prefsManager.saveEmail(email)
+                    }
+                    onSuccess()
+                } else {
+                    onError(task.exception?.localizedMessage ?: "Identifiants incorrects")
+                }
+            }
+    }
+
+    /**
+     * Inscription : Vérifie le pseudo, crée le compte, sauvegarde Firestore ET mémorise l'email
      */
     fun registerUser(
         email: String,
         pass: String,
         nom: String,
         prenom: String,
-        username: String, // <-- NOUVEAU PARAMÈTRE
+        username: String,
         interests: List<String>,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
-        // 1. On vérifie d'abord si le nom d'utilisateur existe déjà dans Firestore
         firestore.collection("users")
             .whereEqualTo("username", username)
             .get()
             .addOnSuccessListener { documents ->
                 if (!documents.isEmpty) {
-                    // Si on trouve un document, c'est que le pseudo est pris !
-                    onError("Ce nom d'utilisateur est déjà pris. Veuillez en choisir un autre.")
+                    onError("Ce nom d'utilisateur est déjà pris.")
                 } else {
-                    // 2. Le pseudo est libre ! On crée le compte Firebase Auth
                     auth.createUserWithEmailAndPassword(email, pass)
                         .addOnCompleteListener { task ->
                             if (task.isSuccessful) {
                                 val userId = task.result?.user?.uid
 
                                 if (userId != null) {
-                                    // 3. Préparation des données pour Firestore
                                     val userMap = hashMapOf(
                                         "id" to userId,
                                         "email" to email,
                                         "nom" to nom,
                                         "prenom" to prenom,
-                                        "username" to username, // <-- ON SAUVEGARDE LE PSEUDO
+                                        "username" to username,
                                         "interests" to interests,
                                         "bio" to "",
                                         "location" to ""
                                     )
 
-                                    // 4. Sauvegarde finale dans la collection "users"
                                     firestore.collection("users").document(userId)
                                         .set(userMap)
-                                        .addOnSuccessListener { onSuccess() }
-                                        .addOnFailureListener { e ->
-                                            onError(e.localizedMessage ?: "Erreur lors de la sauvegarde du profil")
+                                        .addOnSuccessListener {
+                                            // --- NOUVEAU : On mémorise aussi à l'inscription ---
+                                            viewModelScope.launch {
+                                                prefsManager.saveEmail(email)
+                                            }
+                                            onSuccess()
                                         }
-                                } else {
-                                    onSuccess()
-                                }
+                                        .addOnFailureListener { e ->
+                                            onError(e.localizedMessage ?: "Erreur Firestore")
+                                        }
+                                } else { onSuccess() }
                             } else {
-                                onError(task.exception?.localizedMessage ?: "Erreur lors de l'inscription (Email peut-être déjà utilisé)")
+                                onError(task.exception?.localizedMessage ?: "Erreur d'inscription")
                             }
                         }
                 }
             }
             .addOnFailureListener { e ->
-                onError("Impossible de vérifier le nom d'utilisateur : ${e.localizedMessage}")
-            }
-    }
-
-    /**
-     * Connexion (Inchangée)
-     */
-    fun loginUser(email: String, pass: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        auth.signInWithEmailAndPassword(email, pass)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    onSuccess()
-                } else {
-                    onError(task.exception?.localizedMessage ?: "Identifiants incorrects")
-                }
+                onError("Erreur vérification pseudo : ${e.localizedMessage}")
             }
     }
 }
