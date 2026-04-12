@@ -44,23 +44,40 @@ fun OtherProfileScreen(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var selectedPostForDetail by remember { mutableStateOf<Post?>(null) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    // On utilise statusBarsPadding() pour ne pas coller en haut de l'écran
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .statusBarsPadding()
+    ) {
         if (isLoading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color.Black)
             }
         } else {
-            // --- HEADER IDENTIQUE ---
-            Column(modifier = Modifier.padding(top = 8.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
-                // Barre du haut avec retour
+            // --- HEADER ---
+            Column(modifier = Modifier.padding(top = 16.dp, start = 24.dp, end = 24.dp, bottom = 12.dp)) {
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier.offset(x = (-12).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Retour",
+                            tint = Color.Black
+                        )
                     }
-                    Text(text = "@${userProfile.username}", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "@${userProfile.username}",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Row(
@@ -76,7 +93,10 @@ fun OtherProfileScreen(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(Icons.Default.Image, contentDescription = "Photo", tint = Color.Gray)
                         }
                     }
@@ -97,7 +117,7 @@ fun OtherProfileScreen(
                 }
             }
 
-            // --- ONGLETS IDENTIQUES ---
+            // --- ONGLETS ---
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.White,
@@ -113,7 +133,7 @@ fun OtherProfileScreen(
                 Tab(selected = selectedTabIndex == 1, onClick = { selectedTabIndex = 1 }, text = { Text("Favoris") })
             }
 
-            // --- GRILLE IDENTIQUE ---
+            // --- GRILLE ---
             val currentGridPosts = if (selectedTabIndex == 0) viewModel.userPosts else viewModel.favoritePosts
 
             if (currentGridPosts.isEmpty()) {
@@ -141,7 +161,7 @@ fun OtherProfileScreen(
         }
     }
 
-    // --- DIALOGUE DE DÉTAIL ---
+    // --- DIALOGUE ---
     selectedPostForDetail?.let { post ->
         PostDetailDialog(
             post = post,
@@ -149,9 +169,9 @@ fun OtherProfileScreen(
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { },
-            onUserClick = { /* Déjà sur son profil */ },
+            onUserClick = { },
             onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
-            onDeleteClick = { /* Impossible */ },
+            onDeleteClick = { },
             onReportClick = { postViewModel.reportPost(post) },
             onFavoriteClick = { postViewModel.toggleFavorite(post.id) }
         )

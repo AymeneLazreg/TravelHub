@@ -121,7 +121,15 @@ fun HomeScreen(
             onDismissRequest = { showLikersSheet = false },
             containerColor = Color.White
         ) {
-            Likes(likers = likers)
+            // OPTIMISATION : On permet aussi de cliquer sur les profils dans la liste des Likes
+            Likes(
+                likers = likers,
+                onUserClick = { userId ->
+                    showLikersSheet = false // On ferme la sheet avant de naviguer
+                    onUserClick(userId)
+                }
+            )
         }
     }
+
 }

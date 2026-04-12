@@ -2,7 +2,6 @@ package com.example.travelhub.features.travelshare.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +29,7 @@ fun PostItem(
     isFavorite: Boolean,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
-    onUserClick: (String) -> Unit,
+    onUserClick: (String) -> Unit, // Callback pour la navigation profil
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
@@ -47,19 +46,28 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column {
-            // --- HEADER ---
+            // --- HEADER (Modifié pour le clic profil) ---
             Row(
                 modifier = Modifier.padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Photo de profil cliquable
                 AsyncImage(
                     model = post.userProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${post.username}" },
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp).clip(CircleShape)
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .clickable { onUserClick(post.userId) } // <--- ACTION ICI
                 )
+
                 Spacer(modifier = Modifier.width(12.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onUserClick(post.userId) } // <--- ACTION ICI
+                    ) {
                         Text(post.username, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("• $relativeTime", fontSize = 11.sp, color = Color.Gray)
@@ -117,7 +125,6 @@ fun PostItem(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 1. Bouton Coeur (Action: Like uniquement)
                 IconButton(onClick = onLikeClick) {
                     Icon(
                         imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -126,8 +133,6 @@ fun PostItem(
                     )
                 }
 
-                // 2. Nombre de Likes (Action: Voir la liste uniquement)
-                // On met un petit padding pour que la zone de clic soit facile à viser
                 Text(
                     text = "${post.likesCount}",
                     fontSize = 14.sp,
@@ -140,7 +145,6 @@ fun PostItem(
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                // 3. Section Commentaires (Tout est cliquable ensemble)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier

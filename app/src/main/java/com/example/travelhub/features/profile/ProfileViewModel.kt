@@ -15,6 +15,7 @@ import com.google.firebase.storage.FirebaseStorage
 
 // Data class alignée sur Firestore
 data class UserProfile(
+    val id: String = "", // <--- AJOUTE CETTE LIGNE
     val nom: String = "",
     val prenom: String = "",
     val username: String = "",
