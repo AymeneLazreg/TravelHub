@@ -1,6 +1,7 @@
 package com.example.travelhub.features.travelshare
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect // Changement ici
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,15 +30,14 @@ import com.example.travelhub.utils.getRelativeTime
 @Composable
 fun NotificationsScreen(
     onBackClick: () -> Unit,
+    onUserClick: (String) -> Unit, // --- AJOUT DU PARAMÈTRE ICI ---
     viewModel: NotificationViewModel = viewModel()
 ) {
     val notifications = viewModel.notifications
     val isLoading = viewModel.isLoading
 
-    // --- LOGIQUE DE LECTURE AU DÉPART ---
     DisposableEffect(Unit) {
         onDispose {
-            // Cette ligne s'exécute uniquement quand l'utilisateur quitte l'écran
             viewModel.markAllAsRead()
         }
     }
@@ -69,7 +69,11 @@ fun NotificationsScreen(
                     items(notifications) { notification ->
                         NotificationItem(
                             notification = notification,
-                            onDelete = { viewModel.deleteNotification(notification.id) }
+                            onAvatarClick = { onUserClick(notification.fromUserId) }, // --- REDIRECTION PROFIL ---
+                            onContentClick = {
+                                // On garde cette zone pour ta future logique vers le post/commentaire
+                                println("Clic sur le contenu de la notif : ${notification.id}")
+                            }
                         )
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -84,7 +88,11 @@ fun NotificationsScreen(
 }
 
 @Composable
-fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
+fun NotificationItem(
+    notification: Notification,
+    onAvatarClick: () -> Unit, // --- NOUVEAU ---
+    onContentClick: () -> Unit  // --- NOUVEAU ---
+) {
     val message = when (notification.type) {
         "LIKE" -> "a aimé votre publication."
         "COMMENT" -> "a commenté : \"${notification.commentText}\""
@@ -92,7 +100,6 @@ fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
         else -> "a interagi avec vous."
     }
 
-    // Le style reste en gras tant que 'read' est false
     val backgroundColor = if (notification.read) Color.White else Color(0xFFF0F7FF)
     val fontWeight = if (notification.read) FontWeight.Normal else FontWeight.Bold
     val textColor = if (notification.read) Color.DarkGray else Color.Black
@@ -104,16 +111,25 @@ fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // --- ZONE 1 : AVATAR (DIRECTION PROFIL) ---
         AsyncImage(
             model = notification.fromUserProfileUrl.ifEmpty { "https://ui-avatars.com/api/?name=${notification.fromUsername}" },
             contentDescription = null,
-            modifier = Modifier.size(45.dp).clip(CircleShape),
+            modifier = Modifier
+                .size(45.dp)
+                .clip(CircleShape)
+                .clickable { onAvatarClick() }, // Uniquement la photo mène au profil
             contentScale = ContentScale.Crop
         )
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        Column(modifier = Modifier.weight(1f)) {
+        // --- ZONE 2 : TEXTE (DIRECTION CONTENU) ---
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable { onContentClick() } // Le texte mènera au post plus tard
+        ) {
             Text(
                 text = "${notification.fromUsername} $message",
                 fontSize = 14.sp,
@@ -129,10 +145,14 @@ fun NotificationItem(notification: Notification, onDelete: () -> Unit) {
 
         Spacer(modifier = Modifier.width(8.dp))
 
+        // --- ZONE 3 : MINIATURE POST (DIRECTION CONTENU) ---
         AsyncImage(
             model = notification.postImageUrl,
             contentDescription = null,
-            modifier = Modifier.size(45.dp).clip(RoundedCornerShape(4.dp)),
+            modifier = Modifier
+                .size(45.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable { onContentClick() }, // La petite photo du post mène aussi au post
             contentScale = ContentScale.Crop
         )
     }

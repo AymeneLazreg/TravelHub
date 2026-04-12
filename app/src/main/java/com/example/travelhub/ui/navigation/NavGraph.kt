@@ -13,17 +13,18 @@ import com.example.travelhub.features.main.MainScreen
 import com.example.travelhub.features.profile.EditProfileScreen
 import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileViewModel
-import com.example.travelhub.features.profile.OtherProfileScreen // Import du nouveau fichier
+import com.example.travelhub.features.profile.OtherProfileScreen
 import com.example.travelhub.features.travelpath.TravelPathPreferencesScreen
 import com.example.travelhub.features.travelshare.NotificationsScreen
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.google.firebase.auth.FirebaseAuth // Import pour identifier l'utilisateur actuel
 
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
 
-    // Instances uniques partagées pour les écrans principaux
+    // Instances uniques partagées
     val notificationViewModel: NotificationViewModel = viewModel()
     val postViewModel: PostViewModel = viewModel()
     val profileViewModel: ProfileViewModel = viewModel()
@@ -52,7 +53,7 @@ fun NavGraph() {
             )
         }
 
-        // --- ÉCRAN PRINCIPAL (CONTENEUR) ---
+        // --- ÉCRAN PRINCIPAL ---
         composable("home") {
             MainScreen(
                 navController = navController,
@@ -68,15 +69,30 @@ fun NavGraph() {
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
-
-            // On crée une instance de ViewModel spécifique pour cet utilisateur
             val otherProfileViewModel: OtherProfileViewModel = viewModel()
 
             OtherProfileScreen(
                 userId = userId,
                 viewModel = otherProfileViewModel,
-                postViewModel = postViewModel, // Passé pour permettre les interactions (likes/reports)
+                postViewModel = postViewModel,
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // --- NOTIFICATIONS (MODIFIÉ) ---
+        composable("notifications") {
+            val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
+            NotificationsScreen(
+                onBackClick = { navController.popBackStack() },
+                viewModel = notificationViewModel,
+                onUserClick = { userId ->
+                    // Si on clique sur soi-même dans les notifs, on ne fait rien
+                    // ou on redirige vers son propre profil si besoin.
+                    if (userId != currentUserId) {
+                        navController.navigate("other_profile/$userId")
+                    }
+                }
             )
         }
 
@@ -92,13 +108,6 @@ fun NavGraph() {
             EditProfileScreen(
                 onBackClick = { navController.popBackStack() },
                 onSaveClick = { navController.popBackStack() }
-            )
-        }
-
-        composable("notifications") {
-            NotificationsScreen(
-                onBackClick = { navController.popBackStack() },
-                viewModel = notificationViewModel
             )
         }
     }
