@@ -23,10 +23,10 @@ import com.example.travelhub.features.profile.ProfileScreen
 import com.example.travelhub.features.travelshare.AddPostScreen
 import com.example.travelhub.features.travelshare.HomeScreen
 import com.example.travelhub.features.travelshare.SearchScreen
-import com.example.travelhub.features.travelshare.GroupScreen // IMPORTÉ
+import com.example.travelhub.features.travelshare.GroupScreen // Vérifie que l'import s'est mis à jour ici
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel // IMPORTÉ
+import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 data class BottomNavItem(
@@ -42,24 +42,23 @@ fun MainScreen(
     notificationViewModel: NotificationViewModel,
     postViewModel: PostViewModel,
     profileViewModel: ProfileViewModel,
-    groupViewModel: GroupViewModel // AJOUTÉ ICI
+    groupViewModel: GroupViewModel
 ) {
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid }
 
     LaunchedEffect(Unit) {
         profileViewModel.refreshAllData()
         notificationViewModel.refreshNotifications()
-        groupViewModel.fetchUserGroups() // On rafraîchit les groupes au démarrage
+        groupViewModel.fetchUserGroups()
     }
 
     var currentRoute by rememberSaveable { mutableStateOf("accueil") }
 
-    // Ajout de l'item "Groupes" dans la liste
     val items = listOf(
         BottomNavItem("Accueil", "accueil", Icons.Default.Home),
         BottomNavItem("Recherche", "recherche", Icons.Default.Search),
         BottomNavItem("Ajout", "ajout", Icons.Default.AddCircle),
-        BottomNavItem("Groupes", "groupes", Icons.Default.Groups), // NOUVEL ONGLET
+        BottomNavItem("Groupes", "groupes", Icons.Default.Groups),
         BottomNavItem("Profil", "profil", Icons.Default.Person),
         BottomNavItem("Voyager", "voyager", Icons.Default.Flight)
     )
@@ -76,7 +75,6 @@ fun MainScreen(
                             if (item.route == "profil") {
                                 profileViewModel.loadUserPosts()
                             }
-                            // Rafraîchir les groupes quand on clique sur l'onglet
                             if (item.route == "groupes") {
                                 groupViewModel.fetchUserGroups()
                             }
@@ -98,6 +96,7 @@ fun MainScreen(
                     viewModel = postViewModel,
                     profileViewModel = profileViewModel,
                     notificationViewModel = notificationViewModel,
+                    groupViewModel = groupViewModel, // On le passe aussi ici si besoin
                     onNotificationsClick = {
                         navController.navigate("notifications")
                     },
@@ -114,14 +113,15 @@ fun MainScreen(
                 "ajout" -> AddPostScreen(
                     postViewModel = postViewModel,
                     profileViewModel = profileViewModel,
+                    groupViewModel = groupViewModel,
                     onPostSuccess = {
                         currentRoute = "accueil"
                         profileViewModel.loadUserPosts()
                     }
                 )
-                // --- NOUVEL ÉCRAN DES GROUPES ---
                 "groupes" -> GroupScreen(
-                    viewModel = groupViewModel
+                    viewModel = groupViewModel,
+                    navController = navController // CORRECTION : On passe le navController ici !
                 )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },

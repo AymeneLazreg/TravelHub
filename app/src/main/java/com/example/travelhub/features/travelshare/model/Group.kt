@@ -5,5 +5,5 @@ data class Group(
     val name: String = "",
     val adminId: String = "",
     val members: List<String> = emptyList(),
-    val inviteCode: String = "" // Code de 6 caractères pour rejoindre
+    val imageUrl: String = ""
 )

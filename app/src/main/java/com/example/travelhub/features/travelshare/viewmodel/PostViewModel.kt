@@ -36,6 +36,10 @@ class PostViewModel : ViewModel() {
     private val _selectedCategory = MutableStateFlow<String?>(null)
     private val _selectedDate = MutableStateFlow<Long?>(null)
 
+    // --- État pour le filtrage par groupe ---
+    private val _selectedGroupId = MutableStateFlow<String?>(null)
+    val selectedGroupId: StateFlow<String?> = _selectedGroupId
+
     var selectedPostIdFromNotif by mutableStateOf<String?>(null)
     var shouldOpenCommentsFromNotif by mutableStateOf<Boolean>(false)
 
@@ -44,12 +48,23 @@ class PostViewModel : ViewModel() {
         shouldOpenCommentsFromNotif = false
     }
 
+    // --- LOGIQUE DE FILTRAGE MISE À JOUR POUR LE MÉLANGE ---
     val filteredPosts: StateFlow<List<Post>> = combine(
-        _posts, _searchQuery, _selectedCategory, _selectedDate
-    ) { posts, query, category, dateMillis ->
+        _posts, _searchQuery, _selectedCategory, _selectedDate, _selectedGroupId
+    ) { posts, query, category, dateMillis, groupId ->
         val cleanQuery = query.trim().lowercase()
 
         posts.filter { post ->
+            // LOGIQUE DE GROUPE MODIFIÉE :
+            val matchesGroup = if (groupId != null) {
+                // SI on est dans le détail d'un groupe spécifique : Filtrage strict
+                post.groupId == groupId
+            } else {
+                // SI on est sur le Home (groupId == null) :
+                // On affiche TOUT (Public + Publications de groupes)
+                true
+            }
+
             val matchesQuery = cleanQuery.isBlank() ||
                     post.username.lowercase().contains(cleanQuery) ||
                     post.locationName.lowercase().contains(cleanQuery) ||
@@ -64,7 +79,8 @@ class PostViewModel : ViewModel() {
                 val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
                 sdf.format(postDate) == sdf.format(selectedDate)
             }
-            matchesQuery && matchesCategory && matchesDate
+
+            matchesGroup && matchesQuery && matchesCategory && matchesDate
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
@@ -88,6 +104,11 @@ class PostViewModel : ViewModel() {
     fun onSearchQueryChanged(newQuery: String) { _searchQuery.value = newQuery }
     fun onCategorySelected(category: String?) { _selectedCategory.value = category }
     fun onDateSelected(date: Long?) { _selectedDate.value = date }
+
+    // Fonction pour changer le filtre de groupe
+    fun filterByGroup(groupId: String?) {
+        _selectedGroupId.value = groupId
+    }
 
     fun toggleLike(post: Post) {
         val currentUser = auth.currentUser ?: return
@@ -162,14 +183,15 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- UPLOAD MODIFIÉ AVEC GROUP ID ---
+    // AJOUT DU PARAMÈTRE groupName ICI
     fun uploadPost(
         imageUri: Uri,
         description: String,
         location: String,
         category: String,
         tags: List<String>,
-        groupId: String? = null, // Paramètre ajouté
+        groupId: String? = null,
+        groupName: String? = null, // Paramètre ajouté
         onComplete: () -> Unit
     ) {
         val currentUser = auth.currentUser ?: return
@@ -184,23 +206,6 @@ class PostViewModel : ViewModel() {
 
                 val postId = firestore.collection("posts").document().id
 
-                // On prépare l'objet avec le groupId (sera null si public)
-                val newPost = Post(
-                    id = postId,
-                    userId = currentUser.uid,
-                    username = userDoc.getString("username") ?: "Aventurier",
-                    userProfileUrl = userDoc.getString("photoUrl") ?: "",
-                    imageUrl = downloadUrl.toString(),
-                    description = description,
-                    locationName = location,
-                    category = category,
-                    tags = tags,
-                    timestamp = com.google.firebase.Timestamp.now(),
-                    // Si ta data class Post ne contient pas encore ce champ,
-                    // assure-toi de l'ajouter dans ton fichier Post.kt
-                )
-
-                // On utilise un Map pour être sûr que Firestore enregistre le champ groupId
                 val postData = hashMapOf(
                     "id" to postId,
                     "userId" to currentUser.uid,
@@ -212,7 +217,8 @@ class PostViewModel : ViewModel() {
                     "category" to category,
                     "tags" to tags,
                     "timestamp" to com.google.firebase.Timestamp.now(),
-                    "groupId" to groupId, // Champ ajouté ici
+                    "groupName" to groupName, // Utilisation du paramètre
+                    "groupId" to groupId,
                     "likesCount" to 0,
                     "likedBy" to emptyList<String>(),
                     "comments" to emptyList<Comment>()

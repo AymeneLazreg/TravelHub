@@ -16,7 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +33,7 @@ import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
+import com.example.travelhub.features.travelshare.model.Group
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,7 +41,7 @@ fun AddPostScreen(
     onPostSuccess: () -> Unit = {},
     postViewModel: PostViewModel = viewModel(),
     profileViewModel: ProfileViewModel = viewModel(),
-    groupViewModel: GroupViewModel = viewModel() // Ajouté ici
+    groupViewModel: GroupViewModel = viewModel()
 ) {
     var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -53,7 +54,6 @@ fun AddPostScreen(
     val context = LocalContext.current
     val isUploading by postViewModel.isUploading.collectAsState()
 
-    val availableTags = listOf("Coucher de soleil", "Architecture", "Calme", "Gratuit", "Hiver")
     val selectedTags = remember { mutableStateListOf<String>() }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -61,7 +61,6 @@ fun AddPostScreen(
         onResult = { uri -> selectedImageUri = uri }
     )
 
-    // Charger les groupes de l'utilisateur au démarrage
     LaunchedEffect(Unit) {
         groupViewModel.fetchUserGroups()
     }
@@ -80,7 +79,6 @@ fun AddPostScreen(
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
-        // Zone d'upload Photo
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -96,7 +94,6 @@ fun AddPostScreen(
             if (selectedImageUri == null) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Add, null, modifier = Modifier.size(48.dp), tint = Color.Gray)
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text("Upload Photo", color = Color.DarkGray, fontWeight = FontWeight.Medium)
                 }
             } else {
@@ -111,7 +108,6 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Location
         Text("Location", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = location,
@@ -123,7 +119,6 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Description
         Text("Description", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = description,
@@ -135,39 +130,19 @@ fun AddPostScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Catégorie
         Text("Catégorie", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(categories) { category ->
                 FilterChip(
                     selected = selectedCategory == category,
                     onClick = { selectedCategory = category },
-                    label = { Text(category) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFFE3F2FD),
-                        selectedLabelColor = Color(0xFF1976D2)
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Tags
-        Text("Tags", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-        LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(availableTags) { tag ->
-                FilterChip(
-                    selected = selectedTags.contains(tag),
-                    onClick = { if (selectedTags.contains(tag)) selectedTags.remove(tag) else selectedTags.add(tag) },
-                    label = { Text(tag) }
+                    label = { Text(category) }
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // BOUTON PUBLISH AVEC MENU DE SÉLECTION DE GROUPE
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (isUploading) {
                 CircularProgressIndicator(color = Color.Black)
@@ -188,26 +163,48 @@ fun AddPostScreen(
                 onDismissRequest = { expandedMenu = false },
                 modifier = Modifier.fillMaxWidth(0.8f)
             ) {
-                // Option 1 : PUBLIC
                 DropdownMenuItem(
                     text = { Text("Publier en public") },
                     leadingIcon = { Icon(Icons.Default.Public, null) },
                     onClick = {
                         expandedMenu = false
-                        publishAction(null, selectedImageUri, description, location, selectedCategory, selectedTags, postViewModel, profileViewModel, context, onPostSuccess)
+                        publishAction(
+                            groupId = null,
+                            groupName = null,
+                            uri = selectedImageUri,
+                            description = description,
+                            location = location,
+                            category = selectedCategory,
+                            tags = selectedTags.toList(),
+                            postViewModel = postViewModel,
+                            profileViewModel = profileViewModel,
+                            context = context,
+                            onPostSuccess = onPostSuccess
+                        )
                     }
                 )
 
-                // Options suivantes : LES GROUPES DE L'UTILISATEUR
                 if (groupViewModel.userGroups.isNotEmpty()) {
                     Divider()
                     groupViewModel.userGroups.forEach { group ->
                         DropdownMenuItem(
-                            text = { Text("Groupe : ${group.name.replaceFirstChar { it.uppercase() }}") },
-                            leadingIcon = { Icon(Icons.Default.Group, null) },
+                            text = { Text("Groupe : ${group.name}") },
+                            leadingIcon = { Icon(Icons.Default.Groups, null) },
                             onClick = {
                                 expandedMenu = false
-                                publishAction(group.id, selectedImageUri, description, location, selectedCategory, selectedTags, postViewModel, profileViewModel, context, onPostSuccess)
+                                publishAction(
+                                    groupId = group.id,
+                                    groupName = group.name, // PASSAGE DU NOM ICI
+                                    uri = selectedImageUri,
+                                    description = description,
+                                    location = location,
+                                    category = selectedCategory,
+                                    tags = selectedTags.toList(),
+                                    postViewModel = postViewModel,
+                                    profileViewModel = profileViewModel,
+                                    context = context,
+                                    onPostSuccess = onPostSuccess
+                                )
                             }
                         )
                     }
@@ -218,9 +215,9 @@ fun AddPostScreen(
     }
 }
 
-// Fonction utilitaire pour éviter de dupliquer le code de publication
 private fun publishAction(
     groupId: String?,
+    groupName: String?,
     uri: Uri?,
     description: String,
     location: String,
@@ -238,10 +235,11 @@ private fun publishAction(
             location = location,
             category = category,
             tags = tags,
-            groupId = groupId // On passe l'ID du groupe ici (ou null)
+            groupId = groupId,
+            groupName = groupName // ENVOI AU VIEWMODEL
         ) {
             profileViewModel.loadUserPosts()
-            Toast.makeText(context, if (groupId == null) "Publié en public !" else "Publié dans le groupe !", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Post publié !", Toast.LENGTH_LONG).show()
             onPostSuccess()
         }
     }

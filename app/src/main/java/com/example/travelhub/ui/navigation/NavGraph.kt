@@ -22,11 +22,10 @@ import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileScreen
 import com.example.travelhub.features.travelshare.NotificationsScreen
-// AJOUTE CET IMPORT :
 import com.example.travelhub.features.travelshare.GroupScreen
+import com.example.travelhub.features.travelshare.GroupDetailScreen // IMPORTÉ
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
-// AJOUTE CET IMPORT :
 import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import com.google.firebase.auth.FirebaseAuth
 
@@ -39,7 +38,6 @@ fun NavGraph() {
     val notificationViewModel: NotificationViewModel = viewModel()
     val postViewModel: PostViewModel = viewModel()
     val profileViewModel: ProfileViewModel = viewModel()
-    // ON CRÉE L'INSTANCE DU CERVEAU DES GROUPES ICI :
     val groupViewModel: GroupViewModel = viewModel()
 
     NavHost(
@@ -74,15 +72,30 @@ fun NavGraph() {
                 notificationViewModel = notificationViewModel,
                 postViewModel = postViewModel,
                 profileViewModel = profileViewModel,
-                // ON PASSE LE GROUPVIEWMODEL AU MAINSCREEN S'IL EN A BESOIN :
                 groupViewModel = groupViewModel
             )
         }
 
-        // --- NOUVELLE ROUTE : GROUPES ---
-        composable("groups") {
-            GroupScreen(
-                viewModel = groupViewModel
+        // --- DÉTAIL D'UN GROUPE ---
+        composable(
+            route = "group_detail/{groupId}/{groupName}",
+            arguments = listOf(
+                navArgument("groupId") { type = NavType.StringType },
+                navArgument("groupName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val groupId = backStackEntry.arguments?.getString("groupId") ?: ""
+            val groupName = backStackEntry.arguments?.getString("groupName") ?: ""
+
+            GroupDetailScreen(
+                groupId = groupId,
+                groupName = groupName,
+                viewModel = postViewModel,
+                profileViewModel = profileViewModel,
+                onBack = { navController.popBackStack() },
+                onUserClick = { userId ->
+                    navController.navigate("other_profile/$userId")
+                }
             )
         }
 

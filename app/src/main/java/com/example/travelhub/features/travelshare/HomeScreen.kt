@@ -21,6 +21,8 @@ import com.example.travelhub.features.travelshare.components.PostDetailDialog
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.profile.ProfileViewModel
+import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,10 +31,11 @@ fun HomeScreen(
     viewModel: PostViewModel,
     profileViewModel: ProfileViewModel,
     notificationViewModel: NotificationViewModel,
+    groupViewModel: GroupViewModel = viewModel(),
     onNotificationsClick: () -> Unit,
     onUserClick: (String) -> Unit
 ) {
-    val posts by viewModel.posts.collectAsState()
+    val posts by viewModel.filteredPosts.collectAsState()
     val userProfile = profileViewModel.userProfile
     val hasUnread by remember { derivedStateOf { notificationViewModel.hasUnread } }
 
@@ -42,51 +45,59 @@ fun HomeScreen(
 
     val selectedPost = posts.find { it.id == selectedPostId }
 
-    // --- LOGIQUE DE NAVIGATION DEPUIS LES NOTIFICATIONS (MODIFIÉE) ---
+    // On s'assure que le filtre est bien réinitialisé sur "null" au chargement pour voir le mixte
+    LaunchedEffect(Unit) {
+        viewModel.filterByGroup(null)
+        groupViewModel.fetchUserGroups()
+    }
+
     LaunchedEffect(viewModel.selectedPostIdFromNotif) {
         val postIdFromNotif = viewModel.selectedPostIdFromNotif
         if (postIdFromNotif != null) {
             selectedPostId = postIdFromNotif
-
-            // On attend un court instant pour laisser le PostDetailDialog s'initialiser
-            // et lire le flag "shouldOpenCommentsFromNotif" avant de le clear
             if (viewModel.shouldOpenCommentsFromNotif) {
-                delay(600) // Un peu plus que le delay du Dialog pour être sûr
+                delay(600)
             }
-
             viewModel.clearNavigationRequest()
         }
     }
 
     Scaffold { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color.White)
+        ) {
+            // --- HEADER ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("TravelShare", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
 
-                // --- HEADER ---
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("TravelShare", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-
-                    IconButton(onClick = onNotificationsClick) {
-                        BadgedBox(
-                            badge = {
-                                if (hasUnread) {
-                                    Badge(
-                                        containerColor = Color.Red,
-                                        modifier = Modifier.offset(x = (-4).dp, y = 4.dp)
-                                    )
-                                }
+                IconButton(onClick = onNotificationsClick) {
+                    BadgedBox(
+                        badge = {
+                            if (hasUnread) {
+                                Badge(containerColor = Color.Red)
                             }
-                        ) {
-                            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
                         }
+                    ) {
+                        Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
                     }
                 }
+            }
 
-                // --- LISTE DES POSTS ---
+            // --- LISTE DES POSTS MIXTES ---
+            if (posts.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Aucune publication pour le moment", color = Color.Gray)
+                }
+            } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(posts, key = { it.id }) { post ->
                         val isFavorite = userProfile.favorites.contains(post.id)
@@ -141,12 +152,11 @@ fun HomeScreen(
         }
     }
 
-    // --- DIALOGUE PLEIN ÉCRAN ---
     if (selectedPost != null && !showCommentsSheet && !showLikersSheet) {
         PostDetailDialog(
             post = selectedPost,
             isFavorite = userProfile.favorites.contains(selectedPost.id),
-            viewModel = viewModel, // Passage du ViewModel essentiel pour le flag
+            viewModel = viewModel,
             onDismiss = { selectedPostId = null },
             onLikeClick = { viewModel.toggleLike(selectedPost) },
             onCommentClick = { showCommentsSheet = true },

@@ -21,7 +21,9 @@ data class Post(
     val category: String = "",
     val tags: List<String> = emptyList(),
     val timestamp: Timestamp = Timestamp.now(),
-    val likesCount: Int = 0,
+    val likesCount: Long = 0, // Changé Int en Long pour match avec Firestore
     val likedBy: List<String> = emptyList(),
-    val comments: List<Comment> = emptyList() // Liste d'objets Comment
+    val comments: List<Comment> = emptyList(),
+    val groupName: String? = null,
+    val groupId: String = "" // <--- LA LIGNE MAGIQUE AJOUTÉE
 )
