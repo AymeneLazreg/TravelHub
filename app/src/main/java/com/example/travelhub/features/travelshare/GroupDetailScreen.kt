@@ -70,6 +70,7 @@ fun GroupDetailScreen(
                             onLikeClick = { viewModel.toggleLike(post) },
                             onCommentClick = { /* Optionnel : ouvrir les commentaires */ },
                             onUserClick = onUserClick,
+                            onGroupClick = { _, _ -> /* Déjà dans le groupe, rien à faire */ },
                             onShowLikers = { viewModel.fetchLikersDetails(post.likedBy) },
                             onDeleteClick = { viewModel.deletePost(post) },
                             onReportClick = { viewModel.reportPost(post) },

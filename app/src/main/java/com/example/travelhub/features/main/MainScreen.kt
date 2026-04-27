@@ -23,7 +23,7 @@ import com.example.travelhub.features.profile.ProfileScreen
 import com.example.travelhub.features.travelshare.AddPostScreen
 import com.example.travelhub.features.travelshare.HomeScreen
 import com.example.travelhub.features.travelshare.SearchScreen
-import com.example.travelhub.features.travelshare.GroupScreen // Vérifie que l'import s'est mis à jour ici
+import com.example.travelhub.features.travelshare.GroupScreen
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
@@ -96,7 +96,6 @@ fun MainScreen(
                     viewModel = postViewModel,
                     profileViewModel = profileViewModel,
                     notificationViewModel = notificationViewModel,
-                    groupViewModel = groupViewModel, // On le passe aussi ici si besoin
                     onNotificationsClick = {
                         navController.navigate("notifications")
                     },
@@ -107,13 +106,16 @@ fun MainScreen(
                         } else {
                             navController.navigate("other_profile/$userId")
                         }
+                    },
+                    // --- CORRECTION : AJOUT DE LA NAVIGATION VERS LE GROUPE ---
+                    onGroupClick = { groupId, groupName ->
+                        navController.navigate("group_detail/$groupId/$groupName")
                     }
                 )
                 "recherche" -> SearchScreen()
                 "ajout" -> AddPostScreen(
                     postViewModel = postViewModel,
                     profileViewModel = profileViewModel,
-                    groupViewModel = groupViewModel,
                     onPostSuccess = {
                         currentRoute = "accueil"
                         profileViewModel.loadUserPosts()
@@ -121,7 +123,7 @@ fun MainScreen(
                 )
                 "groupes" -> GroupScreen(
                     viewModel = groupViewModel,
-                    navController = navController // CORRECTION : On passe le navController ici !
+                    navController = navController // Ajout de navController si ton GroupScreen en a besoin
                 )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },

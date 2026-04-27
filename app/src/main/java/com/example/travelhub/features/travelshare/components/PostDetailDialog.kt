@@ -80,6 +80,7 @@ fun PostDetailDialog(
                     onLikeClick = onLikeClick,
                     onCommentClick = { showInternalComments = true },
                     onUserClick = onUserClick,
+                    onGroupClick = { _, _ -> /* Déjà dans le groupe, rien à faire */ },
                     onShowLikers = onShowLikers,
                     onDeleteClick = onDeleteClick,
                     onReportClick = onReportClick,

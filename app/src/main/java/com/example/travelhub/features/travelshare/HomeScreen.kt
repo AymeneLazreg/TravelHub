@@ -33,7 +33,8 @@ fun HomeScreen(
     notificationViewModel: NotificationViewModel,
     groupViewModel: GroupViewModel = viewModel(),
     onNotificationsClick: () -> Unit,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onGroupClick: (String, String) -> Unit // AJOUTÉ POUR LA NAVIGATION
 ) {
     val posts by viewModel.filteredPosts.collectAsState()
     val userProfile = profileViewModel.userProfile
@@ -45,7 +46,6 @@ fun HomeScreen(
 
     val selectedPost = posts.find { it.id == selectedPostId }
 
-    // On s'assure que le filtre est bien réinitialisé sur "null" au chargement pour voir le mixte
     LaunchedEffect(Unit) {
         viewModel.filterByGroup(null)
         groupViewModel.fetchUserGroups()
@@ -110,6 +110,7 @@ fun HomeScreen(
                                 showCommentsSheet = true
                             },
                             onUserClick = onUserClick,
+                            onGroupClick = onGroupClick, // NAVIGATION VERS LE GROUPE
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
@@ -129,7 +130,7 @@ fun HomeScreen(
         }
     }
 
-    // --- BOTTOM SHEETS ---
+    // --- BOTTOM SHEETS & DIALOGS ---
     if (showCommentsSheet && selectedPost != null) {
         ModalBottomSheet(
             onDismissRequest = { showCommentsSheet = false },

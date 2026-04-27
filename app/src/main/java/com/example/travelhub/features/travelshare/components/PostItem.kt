@@ -29,6 +29,7 @@ fun PostItem(
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onUserClick: (String) -> Unit,
+    onGroupClick: (String, String) -> Unit, // AJOUTÉ : (groupId, groupName)
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
@@ -48,6 +49,7 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
+            // --- HEADER ---
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -78,11 +80,13 @@ fun PostItem(
                                 tint = Color.Gray
                             )
                             Text(
-                                // AFFICHE LE VRAI NOM DU GROUPE
                                 text = (post.groupName ?: "Groupe").replaceFirstChar { it.uppercase() },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
-                                color = Color(0xFF1976D2)
+                                color = Color(0xFF1976D2),
+                                modifier = Modifier.clickable {
+                                    onGroupClick(post.groupId, post.groupName ?: "Groupe")
+                                }
                             )
                         }
                     }
@@ -124,6 +128,7 @@ fun PostItem(
                 }
             }
 
+            // --- IMAGE ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -135,6 +140,7 @@ fun PostItem(
                 contentScale = ContentScale.Crop
             )
 
+            // --- BARRE D'ACTIONS ---
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -176,6 +182,7 @@ fun PostItem(
                 }
             }
 
+            // --- DESCRIPTION ---
             if (post.description.isNotBlank()) {
                 Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 20.dp)) {
                     Text(text = post.description, fontSize = 14.sp, lineHeight = 20.sp, color = Color.DarkGray)
