@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.FieldPath
 
 class OtherProfileViewModel : ViewModel() {
@@ -36,12 +35,12 @@ class OtherProfileViewModel : ViewModel() {
                         userProfile = profile
                         Log.d("OtherProfile", "Profil trouvé : ${profile.username}")
 
-                        // 2. Charger les posts et les favoris une fois le profil récupéré
+                        // 2. Charger les posts et les favoris
                         loadPosts(userId)
                         loadFavoritePosts(profile.favorites)
                     }
                 } else {
-                    Log.e("OtherProfile", "Document utilisateur inexistant dans Firestore")
+                    Log.e("OtherProfile", "Document utilisateur inexistant")
                     isLoading = false
                 }
             }
@@ -54,13 +53,16 @@ class OtherProfileViewModel : ViewModel() {
     private fun loadPosts(userId: String) {
         firestore.collection("posts")
             .whereEqualTo("userId", userId)
-            // Note : Si ça ne s'affiche toujours pas, commente la ligne orderBy temporairement
-            // Car un index Firestore manquant peut bloquer la requête
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+            // On ne met PAS de .orderBy() ici pour éviter l'erreur d'index Firestore
             .get()
             .addOnSuccessListener { snapshot ->
-                userPosts = snapshot.toObjects(Post::class.java)
-                Log.d("OtherProfile", "${userPosts.size} posts récupérés")
+                // SOLUTION 1 : On récupère les objets ET on les trie en Kotlin
+                val posts = snapshot.toObjects(Post::class.java)
+
+                // On trie par timestamp (du plus récent au plus ancien)
+                userPosts = posts.sortedByDescending { it.timestamp }
+
+                Log.d("OtherProfile", "${userPosts.size} posts récupérés et triés")
                 isLoading = false
             }
             .addOnFailureListener { e ->
@@ -79,7 +81,9 @@ class OtherProfileViewModel : ViewModel() {
             .whereIn(FieldPath.documentId(), favoriteIds)
             .get()
             .addOnSuccessListener { snapshot ->
-                favoritePosts = snapshot.toObjects(Post::class.java)
+                val favs = snapshot.toObjects(Post::class.java)
+                // Optionnel : Trier aussi les favoris par date
+                favoritePosts = favs.sortedByDescending { it.timestamp }
                 Log.d("OtherProfile", "${favoritePosts.size} favoris récupérés")
             }
             .addOnFailureListener { e ->

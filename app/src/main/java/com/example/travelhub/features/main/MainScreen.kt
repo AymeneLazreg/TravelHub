@@ -13,18 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavController
 
-// --- IMPORTS TRAVELPATH (Ton travail) ---
+// --- IMPORTS TRAVELPATH ---
 import com.example.travelhub.features.travelpath.TravelPathScreen
 import com.example.travelhub.features.travelpath.TravelPathViewModel
 
-// --- IMPORTS TRAVELSHARE (Son travail) ---
+// --- IMPORTS TRAVELSHARE ---
 import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.profile.ProfileScreen
 import com.example.travelhub.features.travelshare.AddPostScreen
 import com.example.travelhub.features.travelshare.HomeScreen
 import com.example.travelhub.features.travelshare.SearchScreen
+import com.example.travelhub.features.travelshare.GroupScreen // IMPORTÉ
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel // IMPORTÉ
 import com.google.firebase.auth.FirebaseAuth
 
 data class BottomNavItem(
@@ -36,30 +38,30 @@ data class BottomNavItem(
 @Composable
 fun MainScreen(
     navController: NavController,
-    // --- FUSION DES VIEWMODELS ---
-    travelPathViewModel: TravelPathViewModel, // Le tien
-    notificationViewModel: NotificationViewModel, // Les siens
+    travelPathViewModel: TravelPathViewModel,
+    notificationViewModel: NotificationViewModel,
     postViewModel: PostViewModel,
-    profileViewModel: ProfileViewModel
+    profileViewModel: ProfileViewModel,
+    groupViewModel: GroupViewModel // AJOUTÉ ICI
 ) {
-    // Récupération de l'ID de l'utilisateur actuel pour la comparaison
     val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid }
 
-    // --- INITIALISATION AU CHARGEMENT (Son travail) ---
     LaunchedEffect(Unit) {
         profileViewModel.refreshAllData()
         notificationViewModel.refreshNotifications()
+        groupViewModel.fetchUserGroups() // On rafraîchit les groupes au démarrage
     }
 
-    // Utilisation de rememberSaveable (Ton travail) pour la stabilité de navigation
     var currentRoute by rememberSaveable { mutableStateOf("accueil") }
 
+    // Ajout de l'item "Groupes" dans la liste
     val items = listOf(
         BottomNavItem("Accueil", "accueil", Icons.Default.Home),
         BottomNavItem("Recherche", "recherche", Icons.Default.Search),
         BottomNavItem("Ajout", "ajout", Icons.Default.AddCircle),
+        BottomNavItem("Groupes", "groupes", Icons.Default.Groups), // NOUVEL ONGLET
         BottomNavItem("Profil", "profil", Icons.Default.Person),
-        BottomNavItem("Voyager", "voyager", Icons.Default.Flight) // Gardé "Flight" pour le design
+        BottomNavItem("Voyager", "voyager", Icons.Default.Flight)
     )
 
     Scaffold(
@@ -71,9 +73,12 @@ fun MainScreen(
                         selected = currentRoute == item.route,
                         onClick = {
                             currentRoute = item.route
-                            // Rafraîchissement manuel spécifique quand on clique sur l'onglet Profil (Son travail)
                             if (item.route == "profil") {
                                 profileViewModel.loadUserPosts()
+                            }
+                            // Rafraîchir les groupes quand on clique sur l'onglet
+                            if (item.route == "groupes") {
+                                groupViewModel.fetchUserGroups()
                             }
                         },
                         alwaysShowLabel = false
@@ -89,7 +94,6 @@ fun MainScreen(
             contentAlignment = Alignment.Center
         ) {
             when (currentRoute) {
-                // --- SES ONGLETS ---
                 "accueil" -> HomeScreen(
                     viewModel = postViewModel,
                     profileViewModel = profileViewModel,
@@ -98,7 +102,6 @@ fun MainScreen(
                         navController.navigate("notifications")
                     },
                     onUserClick = { userId ->
-                        // CONDITION : Si c'est mon ID, je vais sur l'onglet profil
                         if (userId == currentUserId) {
                             currentRoute = "profil"
                             profileViewModel.loadUserPosts()
@@ -116,6 +119,10 @@ fun MainScreen(
                         profileViewModel.loadUserPosts()
                     }
                 )
+                // --- NOUVEL ÉCRAN DES GROUPES ---
+                "groupes" -> GroupScreen(
+                    viewModel = groupViewModel
+                )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },
                     onLogoutClick = {
@@ -126,13 +133,11 @@ fun MainScreen(
                     profileViewModel = profileViewModel,
                     postViewModel = postViewModel,
                     onUserClick = { userId ->
-                        // Si on clique sur soi-même depuis son propre profil, on ne fait rien
                         if (userId != currentUserId) {
                             navController.navigate("other_profile/$userId")
                         }
                     }
                 )
-                // --- TON ONGLET ---
                 "voyager" -> TravelPathScreen(
                     onNewSearchClick = { navController.navigate("travel_preferences") },
                     onItineraryClick = { id -> navController.navigate("itinerary_detail/$id") },

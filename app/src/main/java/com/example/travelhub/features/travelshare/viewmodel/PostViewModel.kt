@@ -1,30 +1,27 @@
 package com.example.travelhub.features.travelshare.viewmodel
 
 import android.net.Uri
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.travelhub.features.profile.UserProfile
-import com.example.travelhub.features.travelshare.model.Post
 import com.example.travelhub.features.travelshare.model.Comment
-import com.example.travelhub.features.travelshare.model.Notification // Ajouté
+import com.example.travelhub.features.travelshare.model.Notification
+import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.UUID
 import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.Date
-import android.util.Log
-import kotlinx.coroutines.tasks.await
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
+import java.util.*
 
 class PostViewModel : ViewModel() {
 
@@ -39,13 +36,9 @@ class PostViewModel : ViewModel() {
     private val _selectedCategory = MutableStateFlow<String?>(null)
     private val _selectedDate = MutableStateFlow<Long?>(null)
 
-    // --- ÉTATS POUR LA NAVIGATION DEPUIS LES NOTIFS ---
     var selectedPostIdFromNotif by mutableStateOf<String?>(null)
-
-    // On précise bien <Boolean> pour que Kotlin sache que c'est vrai/faux
     var shouldOpenCommentsFromNotif by mutableStateOf<Boolean>(false)
 
-    // Fonction pour réinitialiser après l'ouverture
     fun clearNavigationRequest() {
         selectedPostIdFromNotif = null
         shouldOpenCommentsFromNotif = false
@@ -71,7 +64,6 @@ class PostViewModel : ViewModel() {
                 val sdf = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
                 sdf.format(postDate) == sdf.format(selectedDate)
             }
-
             matchesQuery && matchesCategory && matchesDate
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
@@ -97,7 +89,6 @@ class PostViewModel : ViewModel() {
     fun onCategorySelected(category: String?) { _selectedCategory.value = category }
     fun onDateSelected(date: Long?) { _selectedDate.value = date }
 
-    // --- LIKES ---
     fun toggleLike(post: Post) {
         val currentUser = auth.currentUser ?: return
         val postRef = firestore.collection("posts").document(post.id)
@@ -105,7 +96,7 @@ class PostViewModel : ViewModel() {
             postRef.update("likesCount", FieldValue.increment(-1L), "likedBy", FieldValue.arrayRemove(currentUser.uid))
         } else {
             postRef.update("likesCount", FieldValue.increment(1L), "likedBy", FieldValue.arrayUnion(currentUser.uid))
-            sendNotification(post, "LIKE") // Ajouté pour le point rouge
+            sendNotification(post, "LIKE")
         }
     }
 
@@ -119,7 +110,6 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- FAVORIS (LA FONCTION QUI MANQUAIT) ---
     fun toggleFavorite(postId: String) {
         val currentUser = auth.currentUser ?: return
         val userRef = firestore.collection("users").document(currentUser.uid)
@@ -133,8 +123,6 @@ class PostViewModel : ViewModel() {
                     userRef.update("favorites", FieldValue.arrayRemove(postId)).await()
                 } else {
                     userRef.update("favorites", FieldValue.arrayUnion(postId)).await()
-
-                    // Optionnel : notifier l'auteur
                     val postDoc = firestore.collection("posts").document(postId).get().await()
                     val post = postDoc.toObject(Post::class.java)
                     if (post != null) {
@@ -145,8 +133,7 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- COMMENTAIRES ---
-    fun addComment(post: Post, text: String) { // Changé postId par post pour la notif
+    fun addComment(post: Post, text: String) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             try {
@@ -175,8 +162,16 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- UPLOAD ---
-    fun uploadPost(imageUri: Uri, description: String, location: String, category: String, tags: List<String>, onComplete: () -> Unit) {
+    // --- UPLOAD MODIFIÉ AVEC GROUP ID ---
+    fun uploadPost(
+        imageUri: Uri,
+        description: String,
+        location: String,
+        category: String,
+        tags: List<String>,
+        groupId: String? = null, // Paramètre ajouté
+        onComplete: () -> Unit
+    ) {
         val currentUser = auth.currentUser ?: return
         viewModelScope.launch {
             _isUploading.value = true
@@ -188,6 +183,8 @@ class PostViewModel : ViewModel() {
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
 
                 val postId = firestore.collection("posts").document().id
+
+                // On prépare l'objet avec le groupId (sera null si public)
                 val newPost = Post(
                     id = postId,
                     userId = currentUser.uid,
@@ -198,42 +195,49 @@ class PostViewModel : ViewModel() {
                     locationName = location,
                     category = category,
                     tags = tags,
-                    timestamp = com.google.firebase.Timestamp.now()
+                    timestamp = com.google.firebase.Timestamp.now(),
+                    // Si ta data class Post ne contient pas encore ce champ,
+                    // assure-toi de l'ajouter dans ton fichier Post.kt
                 )
-                firestore.collection("posts").document(postId).set(newPost).await()
+
+                // On utilise un Map pour être sûr que Firestore enregistre le champ groupId
+                val postData = hashMapOf(
+                    "id" to postId,
+                    "userId" to currentUser.uid,
+                    "username" to (userDoc.getString("username") ?: "Aventurier"),
+                    "userProfileUrl" to (userDoc.getString("photoUrl") ?: ""),
+                    "imageUrl" to downloadUrl.toString(),
+                    "description" to description,
+                    "locationName" to location,
+                    "category" to category,
+                    "tags" to tags,
+                    "timestamp" to com.google.firebase.Timestamp.now(),
+                    "groupId" to groupId, // Champ ajouté ici
+                    "likesCount" to 0,
+                    "likedBy" to emptyList<String>(),
+                    "comments" to emptyList<Comment>()
+                )
+
+                firestore.collection("posts").document(postId).set(postData).await()
                 _isUploading.value = false
                 onComplete()
-            } catch (e: Exception) { _isUploading.value = false }
+            } catch (e: Exception) {
+                Log.e("Upload", "Erreur: ${e.message}")
+                _isUploading.value = false
+            }
         }
     }
 
     fun deletePost(post: Post) {
-
         viewModelScope.launch {
-
             try {
-
-// Suppression de l'image
-
                 val imageRef = storage.getReferenceFromUrl(post.imageUrl)
-
                 imageRef.delete().await()
-
-
-// Suppression du document
-
                 firestore.collection("posts").document(post.id).delete().await()
-
-                Log.d("PostViewModel", "Post supprimé avec succès")
-
             } catch (e: Exception) {
-
                 Log.e("PostViewModel", "Erreur suppression: ${e.message}")
-
             }
-
         }
-
     }
 
     fun reportPost(post: Post) {
@@ -247,7 +251,6 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // --- ENVOI DES NOTIFICATIONS ---
     private fun sendNotification(post: Post, type: String, commentText: String = "") {
         val currentUser = auth.currentUser ?: return
         if (post.userId == currentUser.uid) return
@@ -276,13 +279,9 @@ class PostViewModel : ViewModel() {
 
     fun getSimilarPosts(currentPost: Post): List<Post> {
         val allPosts = _posts.value
-        val currentTags = currentPost.tags // Liste de tags (ex: ["Nature", "Montagne"])
-
+        val currentTags = currentPost.tags
         return allPosts.filter { post ->
-            // On exclut le post actuel de la liste des résultats
-            post.id != currentPost.id &&
-                    // On vérifie s'il y a au moins un tag en commun
-                    post.tags.any { tag -> currentTags.contains(tag) }
+            post.id != currentPost.id && post.tags.any { tag -> currentTags.contains(tag) }
         }
     }
 }

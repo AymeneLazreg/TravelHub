@@ -8,12 +8,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 
-// --- IMPORTS DE TES FONCTIONNALITÉS (TravelPath) ---
+// --- IMPORTS TRAVELPATH ---
 import com.example.travelhub.features.travelpath.ItineraryDetailScreen
 import com.example.travelhub.features.travelpath.TravelPathPreferencesScreen
 import com.example.travelhub.features.travelpath.TravelPathViewModel
 
-// --- IMPORTS DE SA FONCTIONNALITÉ (TravelShare & Auth) ---
+// --- IMPORTS TRAVELSHARE & AUTH ---
 import com.example.travelhub.features.auth.LoginScreen
 import com.example.travelhub.features.auth.RegisterScreen
 import com.example.travelhub.features.main.MainScreen
@@ -22,19 +22,25 @@ import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileScreen
 import com.example.travelhub.features.travelshare.NotificationsScreen
+// AJOUTE CET IMPORT :
+import com.example.travelhub.features.travelshare.GroupScreen
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+// AJOUTE CET IMPORT :
+import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
 
-    // --- INSTANCES PARTAGÉES (Fusion des tiens et des siens) ---
-    val sharedTravelViewModel: TravelPathViewModel = viewModel() // TON cerveau
-    val notificationViewModel: NotificationViewModel = viewModel() // SES cerveaux
+    // --- INSTANCES PARTAGÉES ---
+    val sharedTravelViewModel: TravelPathViewModel = viewModel()
+    val notificationViewModel: NotificationViewModel = viewModel()
     val postViewModel: PostViewModel = viewModel()
     val profileViewModel: ProfileViewModel = viewModel()
+    // ON CRÉE L'INSTANCE DU CERVEAU DES GROUPES ICI :
+    val groupViewModel: GroupViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -44,7 +50,6 @@ fun NavGraph() {
         composable("login") {
             LoginScreen(
                 onLoginSuccess = {
-                    // La version de ta binôme est meilleure ici car elle empêche de revenir au login en faisant "Retour"
                     navController.navigate("home") {
                         popUpTo("login") { inclusive = true }
                     }
@@ -65,20 +70,28 @@ fun NavGraph() {
         composable("home") {
             MainScreen(
                 navController = navController,
-                // On passe TOUS les viewmodels au MainScreen !
                 travelPathViewModel = sharedTravelViewModel,
                 notificationViewModel = notificationViewModel,
                 postViewModel = postViewModel,
-                profileViewModel = profileViewModel
+                profileViewModel = profileViewModel,
+                // ON PASSE LE GROUPVIEWMODEL AU MAINSCREEN S'IL EN A BESOIN :
+                groupViewModel = groupViewModel
             )
         }
 
-        // --- TES ROUTES (TravelPath) ---
+        // --- NOUVELLE ROUTE : GROUPES ---
+        composable("groups") {
+            GroupScreen(
+                viewModel = groupViewModel
+            )
+        }
+
+        // --- TRAVELPATH ---
         composable("travel_preferences") {
             TravelPathPreferencesScreen(
                 onBackClick = { navController.popBackStack() },
                 onGenerateClick = { navController.popBackStack() },
-                travelPathViewModel = sharedTravelViewModel // Tu récupères ton cerveau
+                travelPathViewModel = sharedTravelViewModel
             )
         }
 
@@ -91,7 +104,7 @@ fun NavGraph() {
             )
         }
 
-        // --- SES ROUTES (TravelShare & Profils) ---
+        // --- TRAVELSHARE & PROFILS ---
         composable(
             route = "other_profile/{userId}",
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
