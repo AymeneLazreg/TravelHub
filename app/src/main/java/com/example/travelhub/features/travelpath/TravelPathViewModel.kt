@@ -30,7 +30,7 @@ class TravelPathViewModel : ViewModel() {
 
     private val generativeModel = GenerativeModel(
         modelName = "gemini-2.5-flash",
-        apiKey = "AIzaSyAb06vD_lTq4TCwYztB2tF66Px9lWoKBWw" // <--- N'OUBLIE PAS TA CLÉ !
+        apiKey = "" // <--- N'OUBLIE PAS TA CLÉ !
     )
 
     var itineraries by mutableStateOf<List<Itinerary>>(emptyList())
