@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,13 +33,14 @@ fun TravelPathPreferencesScreen(
     travelPathViewModel: TravelPathViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val citySuggestions = travelPathViewModel.citySuggestions
 
-    var ville by remember { mutableStateOf("") }
+    var locationInput by remember { mutableStateOf("") } // Changé de 'ville' à 'locationInput'
+    var expanded by remember { mutableStateOf(false) }
+
     var budget by remember { mutableStateOf("") }
     var duration by remember { mutableStateOf("") }
     var isGenerating by remember { mutableStateOf(false) }
-
-    // NOUVEAU : Une variable pour stocker l'erreur si elle survient
     var errorMessage by remember { mutableStateOf("") }
 
     val activities = listOf("Culture", "Restauration", "Loisirs", "Découverte")
@@ -64,15 +66,46 @@ fun TravelPathPreferencesScreen(
             Text("Nouveau Parcours", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp))
         }
 
-        Text("Ville de destination", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
-        OutlinedTextField(
-            value = ville,
-            onValueChange = { ville = it },
-            placeholder = { Text("Ex: Rome, Tokyo, Paris...") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            singleLine = true
-        )
+        Text("Destination (Ville et Pays)", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = locationInput,
+                onValueChange = { newValue ->
+                    locationInput = newValue
+                    travelPathViewModel.searchCity(newValue)
+                    expanded = true
+                },
+                placeholder = { Text("Ex: Londres, Royaume-Uni...") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                shape = RoundedCornerShape(8.dp),
+                singleLine = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
+            )
+
+            DropdownMenu(
+                expanded = expanded && citySuggestions.isNotEmpty(),
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .background(Color.White)
+                    .exposedDropdownSize(),
+                properties = PopupProperties(focusable = false)
+            ) {
+                citySuggestions.forEach { suggestion ->
+                    DropdownMenuItem(
+                        text = { Text(suggestion) },
+                        onClick = {
+                            locationInput = suggestion // On garde le format "Ville (Pays)"
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -145,27 +178,20 @@ fun TravelPathPreferencesScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // NOUVEAU : Zone d'affichage de l'erreur (copiable)
         if (errorMessage.isNotEmpty()) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Détail de l'erreur :", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("Erreur de génération :", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(modifier = Modifier.height(8.dp))
-
-                    // La magie est ici : ça rend le texte copiable !
                     SelectionContainer {
                         Text(text = errorMessage, color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 14.sp)
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
-                        onClick = { errorMessage = "" }, // Efface l'erreur pour cacher la boîte
+                        onClick = { errorMessage = "" },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("Fermer", color = MaterialTheme.colorScheme.onErrorContainer)
@@ -176,16 +202,16 @@ fun TravelPathPreferencesScreen(
 
         Button(
             onClick = {
-                if (ville.isBlank() || budget.isBlank() || duration.isBlank()) {
-                    Toast.makeText(context, "Veuillez remplir la ville, le budget et la durée.", Toast.LENGTH_SHORT).show()
+                if (locationInput.isBlank() || budget.isBlank() || duration.isBlank()) {
+                    Toast.makeText(context, "Veuillez remplir les informations de destination.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
                 isGenerating = true
-                errorMessage = "" // On réinitialise l'erreur à chaque nouvelle tentative
+                errorMessage = ""
 
                 travelPathViewModel.generateAndSaveItineraries(
-                    ville = ville.trim(),
+                    location = locationInput.trim(),
                     budget = budget,
                     duration = duration,
                     activities = selectedActivities.toList(),
@@ -193,12 +219,10 @@ fun TravelPathPreferencesScreen(
                     sensitivities = selectedSensitivities.toList(),
                     onSuccess = {
                         isGenerating = false
-                        Toast.makeText(context, "Itinéraires générés par l'IA !", Toast.LENGTH_SHORT).show()
                         onGenerateClick()
                     },
                     onError = { errorMsg ->
                         isGenerating = false
-                        // On affiche l'erreur dans la zone de texte au lieu du Toast !
                         errorMessage = errorMsg
                     }
                 )
