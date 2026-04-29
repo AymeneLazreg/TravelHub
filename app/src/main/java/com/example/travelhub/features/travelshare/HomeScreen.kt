@@ -34,7 +34,7 @@ fun HomeScreen(
     groupViewModel: GroupViewModel = viewModel(),
     onNotificationsClick: () -> Unit,
     onUserClick: (String) -> Unit,
-    onGroupClick: (String, String) -> Unit // AJOUTÉ POUR LA NAVIGATION
+    onGroupClick: (String, String) -> Unit
 ) {
     val posts by viewModel.filteredPosts.collectAsState()
     val userProfile = profileViewModel.userProfile
@@ -69,7 +69,6 @@ fun HomeScreen(
                 .padding(padding)
                 .background(Color.White)
         ) {
-            // --- HEADER ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -81,18 +80,13 @@ fun HomeScreen(
 
                 IconButton(onClick = onNotificationsClick) {
                     BadgedBox(
-                        badge = {
-                            if (hasUnread) {
-                                Badge(containerColor = Color.Red)
-                            }
-                        }
+                        badge = { if (hasUnread) Badge(containerColor = Color.Red) }
                     ) {
                         Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
                     }
                 }
             }
 
-            // --- LISTE DES POSTS MIXTES ---
             if (posts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Aucune publication pour le moment", color = Color.Gray)
@@ -110,7 +104,8 @@ fun HomeScreen(
                                 showCommentsSheet = true
                             },
                             onUserClick = onUserClick,
-                            onGroupClick = onGroupClick, // NAVIGATION VERS LE GROUPE
+                            onGroupClick = onGroupClick,
+                            onImageClick = { selectedPostId = post.id }, // ACTION AJOUTÉE ICI
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
@@ -130,22 +125,16 @@ fun HomeScreen(
         }
     }
 
-    // --- BOTTOM SHEETS & DIALOGS ---
+    // Gestion des dialogues (PostDetailDialog est appelé ici)
     if (showCommentsSheet && selectedPost != null) {
-        ModalBottomSheet(
-            onDismissRequest = { showCommentsSheet = false },
-            containerColor = Color.White
-        ) {
+        ModalBottomSheet(onDismissRequest = { showCommentsSheet = false }, containerColor = Color.White) {
             Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)
         }
     }
 
     if (showLikersSheet) {
         val likers by viewModel.likersDetails.collectAsState()
-        ModalBottomSheet(
-            onDismissRequest = { showLikersSheet = false },
-            containerColor = Color.White
-        ) {
+        ModalBottomSheet(onDismissRequest = { showLikersSheet = false }, containerColor = Color.White) {
             Likes(likers = likers, onUserClick = { userId ->
                 showLikersSheet = false
                 onUserClick(userId)

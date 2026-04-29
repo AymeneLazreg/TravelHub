@@ -18,12 +18,16 @@ data class Post(
     val imageUrl: String = "",
     val description: String = "",
     val locationName: String = "",
-    val category: String = "",
+    val category: String = "", // ex: nature, musée, rue
     val tags: List<String> = emptyList(),
     val timestamp: Timestamp = Timestamp.now(),
-    val likesCount: Long = 0, // Changé Int en Long pour match avec Firestore
+    val likesCount: Long = 0,
     val likedBy: List<String> = emptyList(),
     val comments: List<Comment> = emptyList(),
     val groupName: String? = null,
-    val groupId: String = "" // <--- LA LIGNE MAGIQUE AJOUTÉE
+    val groupId: String = "",
+
+    // --- INDISPENSABLE POUR L'ITINÉRAIRE ET LA VUE CARTE
+    val latitude: Double = 0.0,
+    val longitude: Double = 0.0
 )

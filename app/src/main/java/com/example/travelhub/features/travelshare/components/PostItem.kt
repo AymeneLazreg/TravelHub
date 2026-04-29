@@ -29,7 +29,8 @@ fun PostItem(
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
     onUserClick: (String) -> Unit,
-    onGroupClick: (String, String) -> Unit, // AJOUTÉ : (groupId, groupName)
+    onGroupClick: (String, String) -> Unit,
+    onImageClick: () -> Unit, // AJOUTÉ : Pour ouvrir le détail
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
@@ -95,7 +96,7 @@ fun PostItem(
                         Text(
                             text = post.locationName,
                             fontSize = 12.sp,
-                            color = if (!post.groupId.isNullOrEmpty()) Color.Gray else Color(0xFF1976D2),
+                            color = Color(0xFF424242),
                             fontWeight = FontWeight.Medium
                         )
                         Text(text = " • $relativeTime", fontSize = 11.sp, color = Color.Gray)
@@ -128,7 +129,7 @@ fun PostItem(
                 }
             }
 
-            // --- IMAGE ---
+            // --- IMAGE CLIQUABLE ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -136,11 +137,12 @@ fun PostItem(
                     .fillMaxWidth()
                     .height(320.dp)
                     .padding(horizontal = 8.dp)
-                    .clip(RoundedCornerShape(18.dp)),
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onImageClick() }, // ACTION AJOUTÉE ICI
                 contentScale = ContentScale.Crop
             )
 
-            // --- BARRE D'ACTIONS ---
+            // --- ACTIONS ---
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -182,7 +184,6 @@ fun PostItem(
                 }
             }
 
-            // --- DESCRIPTION ---
             if (post.description.isNotBlank()) {
                 Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 20.dp)) {
                     Text(text = post.description, fontSize = 14.sp, lineHeight = 20.sp, color = Color.DarkGray)

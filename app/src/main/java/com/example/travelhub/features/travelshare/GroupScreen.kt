@@ -78,8 +78,10 @@ fun GroupScreen(
                     shape = CircleShape,
                     modifier = Modifier.padding(bottom = 12.dp).shadow(4.dp, CircleShape)
                 ) {
-                    Icon(Icons.Default.GroupAdd, contentDescription = "Rejoindre")
-                }
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Rechercher un groupe"
+                    )                }
 
                 ExtendedFloatingActionButton(
                     onClick = { showCreateDialog = true },
