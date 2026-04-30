@@ -69,4 +69,8 @@ dependencies {
     // API Gemini pour générer les itinéraires
     implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
     implementation("io.coil-kt:coil-compose:2.6.0") // Pour afficher les images internet
+    // Bibliothèque pour utiliser Google Maps avec Jetpack Compose
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+// SDK Maps de base
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 }

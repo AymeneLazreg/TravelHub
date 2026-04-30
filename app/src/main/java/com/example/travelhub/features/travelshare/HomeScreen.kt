@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Map // Ajout de l'icône Map
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +35,8 @@ fun HomeScreen(
     groupViewModel: GroupViewModel = viewModel(),
     onNotificationsClick: () -> Unit,
     onUserClick: (String) -> Unit,
-    onGroupClick: (String, String) -> Unit
+    onGroupClick: (String, String) -> Unit,
+    onMapClick: () -> Unit // NOUVEAU : Action pour ouvrir la carte
 ) {
     val posts by viewModel.filteredPosts.collectAsState()
     val userProfile = profileViewModel.userProfile
@@ -69,6 +71,7 @@ fun HomeScreen(
                 .padding(padding)
                 .background(Color.White)
         ) {
+            // --- HEADER MODIFIÉ ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,15 +81,28 @@ fun HomeScreen(
             ) {
                 Text("TravelShare", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
 
-                IconButton(onClick = onNotificationsClick) {
-                    BadgedBox(
-                        badge = { if (hasUnread) Badge(containerColor = Color.Red) }
-                    ) {
-                        Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // BOUTON CARTE (Ajouté ici)
+                    IconButton(onClick = onMapClick) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Voir la carte",
+                            tint = Color.Black
+                        )
+                    }
+
+                    // BOUTON NOTIFICATIONS
+                    IconButton(onClick = onNotificationsClick) {
+                        BadgedBox(
+                            badge = { if (hasUnread) Badge(containerColor = Color.Red) }
+                        ) {
+                            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
+                        }
                     }
                 }
             }
 
+            // --- LISTE DES POSTS MIXTES ---
             if (posts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Aucune publication pour le moment", color = Color.Gray)
@@ -105,7 +121,7 @@ fun HomeScreen(
                             },
                             onUserClick = onUserClick,
                             onGroupClick = onGroupClick,
-                            onImageClick = { selectedPostId = post.id }, // ACTION AJOUTÉE ICI
+                            onImageClick = { selectedPostId = post.id },
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
@@ -125,7 +141,7 @@ fun HomeScreen(
         }
     }
 
-    // Gestion des dialogues (PostDetailDialog est appelé ici)
+    // Gestion des dialogues
     if (showCommentsSheet && selectedPost != null) {
         ModalBottomSheet(onDismissRequest = { showCommentsSheet = false }, containerColor = Color.White) {
             Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)

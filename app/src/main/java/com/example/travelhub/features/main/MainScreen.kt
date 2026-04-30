@@ -107,9 +107,12 @@ fun MainScreen(
                             navController.navigate("other_profile/$userId")
                         }
                     },
-                    // --- CORRECTION : AJOUT DE LA NAVIGATION VERS LE GROUPE ---
                     onGroupClick = { groupId, groupName ->
                         navController.navigate("group_detail/$groupId/$groupName")
+                    },
+                    onMapClick = {
+                        // Action pour ouvrir l'écran de la carte
+                        navController.navigate("map_explorer")
                     }
                 )
                 "recherche" -> SearchScreen()
@@ -123,7 +126,7 @@ fun MainScreen(
                 )
                 "groupes" -> GroupScreen(
                     viewModel = groupViewModel,
-                    navController = navController // Ajout de navController si ton GroupScreen en a besoin
+                    navController = navController
                 )
                 "profil" -> ProfileScreen(
                     onEditClick = { navController.navigate("edit_profile") },
