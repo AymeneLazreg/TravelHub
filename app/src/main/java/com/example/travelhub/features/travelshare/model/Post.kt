@@ -27,7 +27,7 @@ data class Post(
     val groupName: String? = null,
     val groupId: String = "",
 
-    // --- INDISPENSABLE POUR L'ITINÉRAIRE ET LA VUE CARTE
+    // --- INDISPENSABLE POUR L'ITINÉRAIRE ET LA VUE CARTE ---
     val latitude: Double = 0.0,
     val longitude: Double = 0.0
 )

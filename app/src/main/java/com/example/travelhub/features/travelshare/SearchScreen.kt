@@ -1,5 +1,11 @@
 package com.example.travelhub.features.travelshare
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -11,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,11 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,6 +40,40 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
     val filteredPosts by viewModel.filteredPosts.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+
+    // --- CONFIGURATION RECHERCHE VOCALE ---
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                val data = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                val spokenText = data?.get(0) ?: ""
+                if (spokenText.isNotBlank()) {
+                    searchQuery = spokenText
+                    viewModel.onSearchQueryChanged(spokenText)
+                }
+            }
+        }
+    )
+
+    val startVoiceSearch = {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+
+            // --- FORCE LE FRANÇAIS ICI ---
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fr-FR")
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fr-FR")
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, "fr-FR")
+
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Dites un lieu, un nom ou un tag...")
+        }
+        try {
+            speechRecognizerLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Recherche vocale non disponible", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // États pour le sélecteur de date
     var showDatePicker by remember { mutableStateOf(false) }
@@ -38,7 +81,6 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
 
     val categories = listOf("Nature", "Musée", "Rue", "Magasin", "Restaurant")
 
-    // Dialogue du DatePicker
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
@@ -62,7 +104,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
         // Barre de recherche + Bouton Date
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
@@ -73,6 +115,12 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
                 },
                 placeholder = { Text("Lieu, nom, tag...", fontSize = 14.sp) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                // MICRO AJOUTÉ ICI
+                trailingIcon = {
+                    IconButton(onClick = { startVoiceSearch() }) {
+                        Icon(Icons.Default.Mic, contentDescription = "Vocal", tint = Color(0xFF1976D2))
+                    }
+                },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(24.dp),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -86,7 +134,6 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Bouton Calendrier
             IconButton(
                 onClick = { showDatePicker = true },
                 modifier = Modifier.size(48.dp).background(Color(0xFFF5F5F5), CircleShape)
@@ -101,7 +148,7 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
 
         // Catégories
         LazyRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -113,29 +160,35 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
                         viewModel.onCategorySelected(selectedCategory)
                     },
                     label = { Text(category) },
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFE3F2FD),
+                        selectedLabelColor = Color(0xFF1976D2)
+                    )
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Grille de résultats
+        // Grille de résultats (Design amélioré avec coins plus arrondis)
         if (filteredPosts.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Aucun voyage trouvé pour cette période", color = Color.Gray)
+                Text("Aucun voyage trouvé", color = Color.Gray)
             }
         } else {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
-                contentPadding = PaddingValues(start = 2.dp, end = 2.dp, bottom = 90.dp),
+                contentPadding = PaddingValues(start = 4.dp, end = 4.dp, bottom = 90.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filteredPosts) { post ->
                     AsyncImage(
                         model = post.imageUrl,
                         contentDescription = null,
-                        modifier = Modifier.aspectRatio(1f).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF0F0F0)),
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .padding(3.dp)
+                            .clip(RoundedCornerShape(12.dp)) // Design plus "moderne" que 4.dp
+                            .background(Color(0xFFF0F0F0)),
                         contentScale = ContentScale.Crop
                     )
                 }

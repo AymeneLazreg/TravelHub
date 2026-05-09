@@ -30,13 +30,17 @@ fun PostItem(
     onCommentClick: () -> Unit,
     onUserClick: (String) -> Unit,
     onGroupClick: (String, String) -> Unit,
-    onImageClick: () -> Unit, // AJOUTÉ : Pour ouvrir le détail
+    onImageClick: () -> Unit,
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
     onFavoriteClick: () -> Unit
 ) {
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    // Vérification de l'état de l'utilisateur (Anonyme ou Connecté) [cite: 12, 17]
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val isAnonymous = currentUser == null
+    val currentUserId = currentUser?.uid
+
     val isLiked = post.likedBy.contains(currentUserId)
     val relativeTime = getRelativeTime(post.timestamp.toDate())
     var showMenu by remember { mutableStateOf(false) }
@@ -50,7 +54,7 @@ fun PostItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column {
-            // --- HEADER ---
+            // --- HEADER (Infos auteur et groupe) ---
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -103,6 +107,7 @@ fun PostItem(
                     }
                 }
 
+                // Menu d'options (Suppression ou Signalement) [cite: 15, 36]
                 Box {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreHoriz, contentDescription = null, tint = Color.Gray)
@@ -119,17 +124,25 @@ fun PostItem(
                                 onClick = { showMenu = false; onDeleteClick() }
                             )
                         } else {
+                            // Signalement bloqué si anonyme par sécurité [cite: 36]
                             DropdownMenuItem(
                                 text = { Text("Signaler", color = Color.Red) },
                                 leadingIcon = { Icon(Icons.Default.Report, null, tint = Color.Red) },
-                                onClick = { showMenu = false; onReportClick() }
+                                onClick = {
+                                    if (!isAnonymous) {
+                                        showMenu = false
+                                        onReportClick()
+                                    } else {
+                                        showMenu = false
+                                    }
+                                }
                             )
                         }
                     }
                 }
             }
 
-            // --- IMAGE CLIQUABLE ---
+            // --- IMAGE PUBLIÉE (Cliquable pour voir les détails) [cite: 16, 33] ---
             AsyncImage(
                 model = post.imageUrl,
                 contentDescription = null,
@@ -138,43 +151,73 @@ fun PostItem(
                     .height(320.dp)
                     .padding(horizontal = 8.dp)
                     .clip(RoundedCornerShape(18.dp))
-                    .clickable { onImageClick() }, // ACTION AJOUTÉE ICI
+                    .clickable { onImageClick() },
                 contentScale = ContentScale.Crop
             )
 
-            // --- ACTIONS ---
+            // --- BARRE D'ACTIONS (Likes, Commentaires, Favoris) [cite: 24, 34] ---
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Zone Like séparée en deux parties
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clip(CircleShape).clickable { onLikeClick() }.padding(vertical = 6.dp, horizontal = 10.dp)
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .padding(horizontal = 4.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (isLiked) Color.Red else Color.Black,
-                        modifier = Modifier.size(24.dp)
+                    // Partie 1 : Icône Cœur (Action de Liker - réservé connectés) [cite: 15, 24]
+                    IconButton(
+                        onClick = { if (!isAnonymous) onLikeClick() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (isLiked) Color.Red else Color.Black,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Partie 2 : Chiffre (Consultation liste des likes - accessible à tous) [cite: 24]
+                    Text(
+                        text = "${post.likesCount}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { onShowLikers() }
+                            .padding(start = 2.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
                     )
-                    Spacer(Modifier.width(6.dp))
-                    Text(text = "${post.likesCount}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
+                // Bouton Commentaires (Consultation accessible à tous) [cite: 14, 24]
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clip(CircleShape).clickable { onCommentClick() }.padding(vertical = 6.dp, horizontal = 10.dp)
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onCommentClick() }
+                        .padding(vertical = 6.dp, horizontal = 10.dp)
                 ) {
-                    Icon(imageVector = Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(22.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "${post.comments.size}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "${post.comments.size}",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                IconButton(onClick = onFavoriteClick) {
+                // Bouton Favoris (Réservé connectés) [cite: 26]
+                IconButton(onClick = { if (!isAnonymous) onFavoriteClick() }) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                         contentDescription = null,
@@ -184,15 +227,24 @@ fun PostItem(
                 }
             }
 
+            // --- DESCRIPTION ---
             if (post.description.isNotBlank()) {
                 Column(modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 20.dp)) {
-                    Text(text = post.description, fontSize = 14.sp, lineHeight = 20.sp, color = Color.DarkGray)
+                    Text(
+                        text = post.description,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = Color.DarkGray
+                    )
                 }
             }
         }
     }
 }
 
+/**
+ * Calcule le temps écoulé depuis la publication de la photo [cite: 14]
+ */
 fun getRelativeTime(date: java.util.Date): String {
     val now = java.util.Date().time
     val diff = now - date.time

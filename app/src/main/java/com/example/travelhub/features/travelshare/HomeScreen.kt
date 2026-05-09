@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map // Ajout de l'icône Map
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,6 +24,7 @@ import com.example.travelhub.features.travelshare.viewmodel.NotificationViewMode
 import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,8 +37,11 @@ fun HomeScreen(
     onNotificationsClick: () -> Unit,
     onUserClick: (String) -> Unit,
     onGroupClick: (String, String) -> Unit,
-    onMapClick: () -> Unit // NOUVEAU : Action pour ouvrir la carte
+    onMapClick: () -> Unit
 ) {
+    // Vérification du mode anonyme
+    val isAnonymous = remember { FirebaseAuth.getInstance().currentUser == null }
+
     val posts by viewModel.filteredPosts.collectAsState()
     val userProfile = profileViewModel.userProfile
     val hasUnread by remember { derivedStateOf { notificationViewModel.hasUnread } }
@@ -50,7 +54,10 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.filterByGroup(null)
-        groupViewModel.fetchUserGroups()
+        // On ne charge les groupes que si l'utilisateur est connecté
+        if (!isAnonymous) {
+            groupViewModel.fetchUserGroups()
+        }
     }
 
     LaunchedEffect(viewModel.selectedPostIdFromNotif) {
@@ -71,7 +78,7 @@ fun HomeScreen(
                 .padding(padding)
                 .background(Color.White)
         ) {
-            // --- HEADER MODIFIÉ ---
+            // --- HEADER ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -80,9 +87,8 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text("TravelShare", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // BOUTON CARTE (Ajouté ici)
+                    // BOUTON CARTE
                     IconButton(onClick = onMapClick) {
                         Icon(
                             imageVector = Icons.Default.Map,
@@ -91,18 +97,24 @@ fun HomeScreen(
                         )
                     }
 
-                    // BOUTON NOTIFICATIONS
-                    IconButton(onClick = onNotificationsClick) {
-                        BadgedBox(
-                            badge = { if (hasUnread) Badge(containerColor = Color.Red) }
-                        ) {
-                            Icon(Icons.Outlined.Notifications, contentDescription = "Notifications", tint = Color.Black)
+                    // BOUTON NOTIFICATIONS (Masqué si anonyme)
+                    if (!isAnonymous) {
+                        IconButton(onClick = onNotificationsClick) {
+                            BadgedBox(
+                                badge = { if (hasUnread) Badge(containerColor = Color.Red) }
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Notifications,
+                                    contentDescription = "Notifications",
+                                    tint = Color.Black
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // --- LISTE DES POSTS MIXTES ---
+            // --- LISTE DES POSTS ---
             if (posts.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Aucune publication pour le moment", color = Color.Gray)
@@ -114,7 +126,10 @@ fun HomeScreen(
                         PostItem(
                             post = post,
                             isFavorite = isFavorite,
-                            onLikeClick = { viewModel.toggleLike(post) },
+                            onLikeClick = {
+                                // Action bloquée si anonyme
+                                if (!isAnonymous) viewModel.toggleLike(post)
+                            },
                             onCommentClick = {
                                 selectedPostId = post.id
                                 showCommentsSheet = true
@@ -128,11 +143,17 @@ fun HomeScreen(
                                 selectedPostId = post.id
                             },
                             onDeleteClick = {
-                                viewModel.deletePost(post)
-                                profileViewModel.loadUserPosts()
+                                if (!isAnonymous) {
+                                    viewModel.deletePost(post)
+                                    profileViewModel.loadUserPosts()
+                                }
                             },
-                            onReportClick = { viewModel.reportPost(post) },
-                            onFavoriteClick = { viewModel.toggleFavorite(post.id) }
+                            onReportClick = {
+                                if (!isAnonymous) viewModel.reportPost(post)
+                            },
+                            onFavoriteClick = {
+                                if (!isAnonymous) viewModel.toggleFavorite(post.id)
+                            }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -141,16 +162,23 @@ fun HomeScreen(
         }
     }
 
-    // Gestion des dialogues
+    // Gestion des dialogues (BottomSheet pour commentaires et likes)
     if (showCommentsSheet && selectedPost != null) {
-        ModalBottomSheet(onDismissRequest = { showCommentsSheet = false }, containerColor = Color.White) {
+        ModalBottomSheet(
+            onDismissRequest = { showCommentsSheet = false },
+            containerColor = Color.White
+        ) {
+            // Le composant Comments devra gérer le masquage du champ d'écriture si isAnonymous
             Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)
         }
     }
 
     if (showLikersSheet) {
         val likers by viewModel.likersDetails.collectAsState()
-        ModalBottomSheet(onDismissRequest = { showLikersSheet = false }, containerColor = Color.White) {
+        ModalBottomSheet(
+            onDismissRequest = { showLikersSheet = false },
+            containerColor = Color.White
+        ) {
             Likes(likers = likers, onUserClick = { userId ->
                 showLikersSheet = false
                 onUserClick(userId)
@@ -158,13 +186,16 @@ fun HomeScreen(
         }
     }
 
+    // Dialogue de détail du post
     if (selectedPost != null && !showCommentsSheet && !showLikersSheet) {
         PostDetailDialog(
             post = selectedPost,
             isFavorite = userProfile.favorites.contains(selectedPost.id),
             viewModel = viewModel,
             onDismiss = { selectedPostId = null },
-            onLikeClick = { viewModel.toggleLike(selectedPost) },
+            onLikeClick = {
+                if (!isAnonymous) viewModel.toggleLike(selectedPost)
+            },
             onCommentClick = { showCommentsSheet = true },
             onUserClick = onUserClick,
             onShowLikers = {
@@ -172,12 +203,18 @@ fun HomeScreen(
                 showLikersSheet = true
             },
             onDeleteClick = {
-                viewModel.deletePost(selectedPost)
-                profileViewModel.loadUserPosts()
-                selectedPostId = null
+                if (!isAnonymous) {
+                    viewModel.deletePost(selectedPost)
+                    profileViewModel.loadUserPosts()
+                    selectedPostId = null
+                }
             },
-            onReportClick = { viewModel.reportPost(selectedPost) },
-            onFavoriteClick = { viewModel.toggleFavorite(selectedPost.id) }
+            onReportClick = {
+                if (!isAnonymous) viewModel.reportPost(selectedPost)
+            },
+            onFavoriteClick = {
+                if (!isAnonymous) viewModel.toggleFavorite(selectedPost.id)
+            }
         )
     }
 }

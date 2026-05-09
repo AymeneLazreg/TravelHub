@@ -44,24 +44,41 @@ fun MainScreen(
     profileViewModel: ProfileViewModel,
     groupViewModel: GroupViewModel
 ) {
-    val currentUserId = remember { FirebaseAuth.getInstance().currentUser?.uid }
+    // Vérification de l'état de connexion (null = anonyme) [cite: 12, 17]
+    val currentUser = remember { FirebaseAuth.getInstance().currentUser }
+    val currentUserId = currentUser?.uid
+    val isAnonymous = currentUser == null
 
     LaunchedEffect(Unit) {
-        profileViewModel.refreshAllData()
-        notificationViewModel.refreshNotifications()
-        groupViewModel.fetchUserGroups()
+        // On ne rafraîchit les données sociales que si l'utilisateur est connecté
+        if (!isAnonymous) {
+            profileViewModel.refreshAllData()
+            notificationViewModel.refreshNotifications()
+            groupViewModel.fetchUserGroups()
+        }
     }
 
     var currentRoute by rememberSaveable { mutableStateOf("accueil") }
 
-    val items = listOf(
-        BottomNavItem("Accueil", "accueil", Icons.Default.Home),
-        BottomNavItem("Recherche", "recherche", Icons.Default.Search),
-        BottomNavItem("Ajout", "ajout", Icons.Default.AddCircle),
-        BottomNavItem("Groupes", "groupes", Icons.Default.Groups),
-        BottomNavItem("Profil", "profil", Icons.Default.Person),
-        BottomNavItem("Voyager", "voyager", Icons.Default.Flight)
-    )
+    // --- LOGIQUE DE FILTRAGE DES ONGLETS (MODE ANONYME) ---
+    // On définit les items de base accessibles à tous [cite: 23, 69]
+    val items = remember(isAnonymous) {
+        val baseItems = mutableListOf(
+            BottomNavItem("Accueil", "accueil", Icons.Default.Home),
+            BottomNavItem("Recherche", "recherche", Icons.Default.Search)
+        )
+
+        // On n'ajoute les fonctions sociales que pour le mode connecté
+        if (!isAnonymous) {
+            baseItems.add(BottomNavItem("Ajout", "ajout", Icons.Default.AddCircle))
+            baseItems.add(BottomNavItem("Groupes", "groupes", Icons.Default.Groups))
+            baseItems.add(BottomNavItem("Profil", "profil", Icons.Default.Person))
+        }
+
+        // L'onglet "Voyager" (Passerelle) reste accessible pour l'intégration globale [cite: 3, 69]
+        baseItems.add(BottomNavItem("Voyager", "voyager", Icons.Default.Flight))
+        baseItems
+    }
 
     Scaffold(
         bottomBar = {
@@ -97,7 +114,10 @@ fun MainScreen(
                     profileViewModel = profileViewModel,
                     notificationViewModel = notificationViewModel,
                     onNotificationsClick = {
-                        navController.navigate("notifications")
+                        // En mode anonyme, on peut rediriger vers le login ou bloquer
+                        if (!isAnonymous) {
+                            navController.navigate("notifications")
+                        }
                     },
                     onUserClick = { userId ->
                         if (userId == currentUserId) {
@@ -108,41 +128,53 @@ fun MainScreen(
                         }
                     },
                     onGroupClick = { groupId, groupName ->
-                        navController.navigate("group_detail/$groupId/$groupName")
+                        if (!isAnonymous) {
+                            navController.navigate("group_detail/$groupId/$groupName")
+                        }
                     },
                     onMapClick = {
-                        // Action pour ouvrir l'écran de la carte
+                        // La vue carte (pins) est accessible en mode anonyme [cite: 23, 33]
                         navController.navigate("map_explorer")
                     }
                 )
-                "recherche" -> SearchScreen()
-                "ajout" -> AddPostScreen(
-                    postViewModel = postViewModel,
-                    profileViewModel = profileViewModel,
-                    onPostSuccess = {
-                        currentRoute = "accueil"
-                        profileViewModel.loadUserPosts()
-                    }
-                )
-                "groupes" -> GroupScreen(
-                    viewModel = groupViewModel,
-                    navController = navController
-                )
-                "profil" -> ProfileScreen(
-                    onEditClick = { navController.navigate("edit_profile") },
-                    onLogoutClick = {
-                        navController.navigate("login") {
-                            popUpTo(0)
+                "recherche" -> SearchScreen() // Accessible en anonyme [cite: 13, 23, 29]
+
+                "ajout" -> if (!isAnonymous) {
+                    AddPostScreen(
+                        postViewModel = postViewModel,
+                        profileViewModel = profileViewModel,
+                        onPostSuccess = {
+                            currentRoute = "accueil"
+                            profileViewModel.loadUserPosts()
                         }
-                    },
-                    profileViewModel = profileViewModel,
-                    postViewModel = postViewModel,
-                    onUserClick = { userId ->
-                        if (userId != currentUserId) {
-                            navController.navigate("other_profile/$userId")
+                    )
+                }
+
+                "groupes" -> if (!isAnonymous) {
+                    GroupScreen(
+                        viewModel = groupViewModel,
+                        navController = navController
+                    )
+                }
+
+                "profil" -> if (!isAnonymous) {
+                    ProfileScreen(
+                        onEditClick = { navController.navigate("edit_profile") },
+                        onLogoutClick = {
+                            navController.navigate("login") {
+                                popUpTo(0)
+                            }
+                        },
+                        profileViewModel = profileViewModel,
+                        postViewModel = postViewModel,
+                        onUserClick = { userId ->
+                            if (userId != currentUserId) {
+                                navController.navigate("other_profile/$userId")
+                            }
                         }
-                    }
-                )
+                    )
+                }
+
                 "voyager" -> TravelPathScreen(
                     onNewSearchClick = { navController.navigate("travel_preferences") },
                     onItineraryClick = { id -> navController.navigate("itinerary_detail/$id") },

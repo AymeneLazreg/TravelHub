@@ -48,20 +48,16 @@ class PostViewModel : ViewModel() {
         shouldOpenCommentsFromNotif = false
     }
 
-    // --- LOGIQUE DE FILTRAGE MISE À JOUR POUR LE MÉLANGE ---
+    // --- LOGIQUE DE FILTRAGE MISE À JOUR ---
     val filteredPosts: StateFlow<List<Post>> = combine(
         _posts, _searchQuery, _selectedCategory, _selectedDate, _selectedGroupId
     ) { posts, query, category, dateMillis, groupId ->
         val cleanQuery = query.trim().lowercase()
 
         posts.filter { post ->
-            // LOGIQUE DE GROUPE MODIFIÉE :
             val matchesGroup = if (groupId != null) {
-                // SI on est dans le détail d'un groupe spécifique : Filtrage strict
                 post.groupId == groupId
             } else {
-                // SI on est sur le Home (groupId == null) :
-                // On affiche TOUT (Public + Publications de groupes)
                 true
             }
 
@@ -105,7 +101,6 @@ class PostViewModel : ViewModel() {
     fun onCategorySelected(category: String?) { _selectedCategory.value = category }
     fun onDateSelected(date: Long?) { _selectedDate.value = date }
 
-    // Fonction pour changer le filtre de groupe
     fun filterByGroup(groupId: String?) {
         _selectedGroupId.value = groupId
     }
@@ -183,15 +178,17 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // AJOUT DU PARAMÈTRE groupName ICI
+    // FONCTION MODIFIÉE AVEC LATITUDE ET LONGITUDE
     fun uploadPost(
         imageUri: Uri,
         description: String,
         location: String,
+        latitude: Double,  // NOUVEAU
+        longitude: Double, // NOUVEAU
         category: String,
         tags: List<String>,
         groupId: String? = null,
-        groupName: String? = null, // Paramètre ajouté
+        groupName: String? = null,
         onComplete: () -> Unit
     ) {
         val currentUser = auth.currentUser ?: return
@@ -214,10 +211,12 @@ class PostViewModel : ViewModel() {
                     "imageUrl" to downloadUrl.toString(),
                     "description" to description,
                     "locationName" to location,
+                    "latitude" to latitude,   // ENREGISTREMENT COORDONNÉES
+                    "longitude" to longitude, // ENREGISTREMENT COORDONNÉES
                     "category" to category,
                     "tags" to tags,
                     "timestamp" to com.google.firebase.Timestamp.now(),
-                    "groupName" to groupName, // Utilisation du paramètre
+                    "groupName" to groupName,
                     "groupId" to groupId,
                     "likesCount" to 0,
                     "likedBy" to emptyList<String>(),
