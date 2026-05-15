@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material3.*
@@ -44,7 +45,7 @@ fun PostDetailDialog(
     onFavoriteClick: () -> Unit
 ) {
     var showInternalComments by remember { mutableStateOf(false) }
-    val context = LocalContext.current // NÉCESSAIRE POUR L'INTENT
+    val context = LocalContext.current
 
     LaunchedEffect(key1 = viewModel.shouldOpenCommentsFromNotif) {
         if (viewModel.shouldOpenCommentsFromNotif) {
@@ -76,7 +77,6 @@ fun PostDetailDialog(
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Post principal
                 PostItem(
                     post = post,
                     isFavorite = isFavorite,
@@ -84,21 +84,87 @@ fun PostDetailDialog(
                     onCommentClick = { showInternalComments = true },
                     onUserClick = onUserClick,
                     onGroupClick = { _, _ -> },
-                    onImageClick = { }, // Déjà ouvert
+                    onImageClick = { },
                     onShowLikers = onShowLikers,
                     onDeleteClick = onDeleteClick,
                     onReportClick = onReportClick,
                     onFavoriteClick = onFavoriteClick
                 )
 
-                // BOUTON ITINÉRAIRE (Nouveau) [cite: 20, 44]
+                if (post.category.isNotBlank() || post.tags.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        if (post.category.isNotBlank()) {
+                            Text(
+                                text = "Catégorie",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+
+                            AssistChip(
+                                onClick = { },
+                                label = {
+                                    Text(
+                                        text = post.category,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Category,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                        }
+
+                        if (post.tags.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = "Tags",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(post.tags) { tag ->
+                                    AssistChip(
+                                        onClick = { },
+                                        label = {
+                                            Text(
+                                                text = "#$tag",
+                                                fontSize = 13.sp
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Button(
                     onClick = {
-                        // Création de l'URI de navigation vers Google Maps
-                        val gmmIntentUri = Uri.parse("google.navigation:q=${post.latitude},${post.longitude}")
+                        val destination = if (post.fullAddress.isNotBlank()) {
+                            Uri.encode(post.fullAddress)
+                        } else {
+                            "${post.latitude},${post.longitude}"
+                        }
+
+                        val gmmIntentUri = Uri.parse("google.navigation:q=$destination")
                         val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri)
                         mapIntent.setPackage("com.google.android.apps.maps")
-                        // On vérifie si l'app peut gérer l'intent avant de lancer
                         context.startActivity(mapIntent)
                     },
                     modifier = Modifier
@@ -112,11 +178,13 @@ fun PostDetailDialog(
                     Text("Comment y aller", fontWeight = FontWeight.Bold)
                 }
 
-                // Photos similaires
                 val similarPosts = remember(post) { viewModel.getSimilarPosts(post) }
 
                 if (similarPosts.isNotEmpty()) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        thickness = 0.5.dp
+                    )
 
                     Text(
                         text = "Photos similaires",
@@ -140,19 +208,27 @@ fun PostDetailDialog(
                                     .width(120.dp)
                                     .fillMaxHeight()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .clickable { /* Logique de navigation optionnelle */ },
+                                    .clickable { },
                                 contentScale = ContentScale.Crop
                             )
                         }
                     }
+
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
 
         if (showInternalComments) {
-            ModalBottomSheet(onDismissRequest = { showInternalComments = false }, containerColor = Color.White) {
-                Comments(post = post, viewModel = viewModel, onUserClick = onUserClick)
+            ModalBottomSheet(
+                onDismissRequest = { showInternalComments = false },
+                containerColor = Color.White
+            ) {
+                Comments(
+                    post = post,
+                    viewModel = viewModel,
+                    onUserClick = onUserClick
+                )
             }
         }
     }
