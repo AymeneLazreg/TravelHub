@@ -27,7 +27,6 @@ class GroupViewModel : ViewModel() {
         fetchUserGroups()
     }
 
-    // --- CRÉATION DE GROUPE AVEC PHOTO ET UNICITÉ ---
     fun createGroup(name: String, imageUri: Uri?, onResult: (Boolean, String) -> Unit) {
         val currentUser = auth.currentUser ?: return
         val formattedName = name.trim()
@@ -41,7 +40,6 @@ class GroupViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // 1. Vérifier si le groupe existe déjà (insensible à la casse)
                 val existing = firestore.collection("groups")
                     .get()
                     .await()
@@ -58,7 +56,6 @@ class GroupViewModel : ViewModel() {
 
                 var downloadUrl = ""
 
-                // 2. Upload de l'image si elle existe
                 if (imageUri != null) {
                     val fileName = "groups/${UUID.randomUUID()}.jpg"
                     val ref = storage.reference.child(fileName)
@@ -66,8 +63,8 @@ class GroupViewModel : ViewModel() {
                     downloadUrl = ref.downloadUrl.await().toString()
                 }
 
-                // 3. Création de l'objet Groupe
                 val groupId = firestore.collection("groups").document().id
+
                 val group = Group(
                     id = groupId,
                     name = formattedName,
@@ -76,7 +73,6 @@ class GroupViewModel : ViewModel() {
                     imageUrl = downloadUrl
                 )
 
-                // 4. Enregistrement Firestore
                 firestore.collection("groups").document(groupId).set(group).await()
 
                 fetchUserGroups()
@@ -89,7 +85,6 @@ class GroupViewModel : ViewModel() {
         }
     }
 
-    // --- REJOINDRE PAR NOM (INSENSIBLE À LA CASSE) ---
     fun joinGroupByName(groupName: String, onResult: (Boolean, String) -> Unit) {
         val currentUserId = auth.currentUser?.uid ?: return
         val formattedName = groupName.trim().lowercase()
@@ -99,6 +94,7 @@ class GroupViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val snapshot = firestore.collection("groups").get().await()
+
                 val groupDoc = snapshot.documents.find {
                     it.getString("name")?.lowercase() == formattedName
                 }
@@ -128,7 +124,6 @@ class GroupViewModel : ViewModel() {
         }
     }
 
-    // --- CHARGER LES GROUPES ---
     fun fetchUserGroups() {
         val currentUserId = auth.currentUser?.uid ?: return
         isLoading = true
@@ -145,7 +140,6 @@ class GroupViewModel : ViewModel() {
             }
     }
 
-    // --- QUITTER UN GROUPE ---
     fun leaveGroup(groupId: String, onResult: (Boolean, String) -> Unit) {
         val currentUserId = auth.currentUser?.uid ?: return
         isLoading = true
@@ -166,17 +160,106 @@ class GroupViewModel : ViewModel() {
         }
     }
 
-    // --- SUPPRIMER UN GROUPE ---
     fun deleteGroup(groupId: String, onResult: (Boolean, String) -> Unit) {
         isLoading = true
 
         viewModelScope.launch {
             try {
                 firestore.collection("groups").document(groupId).delete().await()
+
+                val postsSnapshot = firestore.collection("posts")
+                    .whereEqualTo("groupId", groupId)
+                    .get()
+                    .await()
+
+                for (doc in postsSnapshot.documents) {
+                    doc.reference.update(
+                        mapOf(
+                            "groupId" to null,
+                            "groupName" to null
+                        )
+                    ).await()
+                }
+
                 fetchUserGroups()
                 onResult(true, "Groupe supprimé définitivement")
             } catch (e: Exception) {
                 onResult(false, "Erreur lors de la suppression")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    fun updateGroup(
+        group: Group,
+        newName: String,
+        newImageUri: Uri?,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val currentUserId = auth.currentUser?.uid ?: return
+        val formattedName = newName.trim()
+
+        if (formattedName.isEmpty()) {
+            onResult(false, "Le nom ne peut pas être vide")
+            return
+        }
+
+        if (group.adminId != currentUserId) {
+            onResult(false, "Seul l'administrateur peut modifier ce groupe")
+            return
+        }
+
+        isLoading = true
+
+        viewModelScope.launch {
+            try {
+                val existing = firestore.collection("groups")
+                    .get()
+                    .await()
+
+                val alreadyExists = existing.documents.any { doc ->
+                    val docName = doc.getString("name")?.lowercase()
+                    doc.id != group.id && docName == formattedName.lowercase()
+                }
+
+                if (alreadyExists) {
+                    onResult(false, "Ce nom de groupe est déjà pris")
+                    isLoading = false
+                    return@launch
+                }
+
+                var imageUrl = group.imageUrl
+
+                if (newImageUri != null) {
+                    val fileName = "groups/${group.id}_${UUID.randomUUID()}.jpg"
+                    val ref = storage.reference.child(fileName)
+                    ref.putFile(newImageUri).await()
+                    imageUrl = ref.downloadUrl.await().toString()
+                }
+
+                firestore.collection("groups").document(group.id)
+                    .update(
+                        mapOf(
+                            "name" to formattedName,
+                            "imageUrl" to imageUrl
+                        )
+                    )
+                    .await()
+
+                val postsSnapshot = firestore.collection("posts")
+                    .whereEqualTo("groupId", group.id)
+                    .get()
+                    .await()
+
+                for (doc in postsSnapshot.documents) {
+                    doc.reference.update("groupName", formattedName).await()
+                }
+
+                fetchUserGroups()
+                onResult(true, "Groupe modifié avec succès")
+            } catch (e: Exception) {
+                onResult(false, e.message ?: "Erreur lors de la modification")
             } finally {
                 isLoading = false
             }

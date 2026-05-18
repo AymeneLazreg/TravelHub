@@ -74,4 +74,5 @@ dependencies {
 // SDK Maps de base
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.2.0")
+    implementation("com.google.mlkit:image-labeling:17.0.9")
 }

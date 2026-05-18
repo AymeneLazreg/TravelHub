@@ -8,14 +8,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.travelhub.features.travelshare.model.Post
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.storage.FirebaseStorage
 
 // Data class alignée sur Firestore
 data class UserProfile(
-    val id: String = "", // <--- AJOUTE CETTE LIGNE
+    val id: String = "",
     val nom: String = "",
     val prenom: String = "",
     val username: String = "",
@@ -54,7 +54,6 @@ class ProfileViewModel : ViewModel() {
      */
     fun refreshAllData() {
         isLoading = true
-        // Important : on vide pour ne pas afficher brièvement les données du compte précédent
         userProfile = UserProfile()
         userPosts = emptyList()
         favoritePosts = emptyList()
@@ -77,6 +76,7 @@ class ProfileViewModel : ViewModel() {
                     isLoading = false
                     return@addSnapshotListener
                 }
+
                 if (document != null && document.exists()) {
                     val profile = document.toObject(UserProfile::class.java)
                     if (profile != null) {
@@ -84,6 +84,7 @@ class ProfileViewModel : ViewModel() {
                         loadFavoritePosts(profile.favorites)
                     }
                 }
+
                 isLoading = false
             }
     }
@@ -99,7 +100,6 @@ class ProfileViewModel : ViewModel() {
             .whereEqualTo("userId", userId)
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
-                // Dès qu'on reçoit une réponse (même erreur d'index), on arrête le chargement
                 isLoading = false
 
                 if (e != null) {
@@ -128,9 +128,50 @@ class ProfileViewModel : ViewModel() {
                     Log.e("ProfileViewModel", "Erreur favoris: ${e.message}")
                     return@addSnapshotListener
                 }
+
                 if (snapshot != null) {
                     favoritePosts = snapshot.toObjects(Post::class.java).toList()
                 }
+            }
+    }
+
+    // --- MISE À JOUR DES INFOS USER DANS LES ANCIENS POSTS ---
+    private fun updateUserInfoInPosts(
+        userId: String,
+        username: String,
+        photoUrl: String,
+        onComplete: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        firestore.collection("posts")
+            .whereEqualTo("userId", userId)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                val batch = firestore.batch()
+
+                snapshot.documents.forEach { document ->
+                    batch.update(
+                        document.reference,
+                        mapOf(
+                            "username" to username,
+                            "userProfileUrl" to photoUrl
+                        )
+                    )
+                }
+
+                batch.commit()
+                    .addOnSuccessListener {
+                        Log.d("ProfileViewModel", "Anciennes publications mises à jour")
+                        onComplete?.invoke()
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("ProfileViewModel", "Erreur batch posts: ${e.message}")
+                        onError?.invoke(e.localizedMessage ?: "Erreur mise à jour posts")
+                    }
+            }
+            .addOnFailureListener { e ->
+                Log.e("ProfileViewModel", "Erreur récupération posts: ${e.message}")
+                onError?.invoke(e.localizedMessage ?: "Erreur récupération posts")
             }
     }
 
@@ -145,6 +186,9 @@ class ProfileViewModel : ViewModel() {
         onError: (String) -> Unit
     ) {
         val userId = auth.currentUser?.uid ?: return
+
+        val currentPhotoUrl = userProfile.photoUrl
+
         val updates = hashMapOf<String, Any>(
             "nom" to nom,
             "prenom" to prenom,
@@ -155,23 +199,64 @@ class ProfileViewModel : ViewModel() {
 
         firestore.collection("users").document(userId)
             .update(updates)
-            .addOnSuccessListener { onSuccess() }
-            .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur") }
+            .addOnSuccessListener {
+                updateUserInfoInPosts(
+                    userId = userId,
+                    username = username,
+                    photoUrl = currentPhotoUrl,
+                    onComplete = {
+                        onSuccess()
+                    },
+                    onError = { error ->
+                        onError(error)
+                    }
+                )
+            }
+            .addOnFailureListener { e ->
+                onError(e.localizedMessage ?: "Erreur")
+            }
     }
 
     // --- UPLOAD IMAGE DE PROFIL ---
-    fun uploadProfileImage(uri: Uri, onSuccess: () -> Unit, onError: (String) -> Unit) {
+    fun uploadProfileImage(
+        uri: Uri,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
         val userId = auth.currentUser?.uid ?: return
         val storageRef = storage.reference.child("profile_images/$userId.jpg")
 
-        storageRef.putFile(uri).addOnSuccessListener {
-            storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
-                firestore.collection("users").document(userId)
-                    .update("photoUrl", downloadUrl.toString())
-                    .addOnSuccessListener { onSuccess() }
-                    .addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur Firestore") }
+        storageRef.putFile(uri)
+            .addOnSuccessListener {
+                storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
+                    val newPhotoUrl = downloadUrl.toString()
+                    val currentUsername = userProfile.username
+
+                    firestore.collection("users").document(userId)
+                        .update("photoUrl", newPhotoUrl)
+                        .addOnSuccessListener {
+                            updateUserInfoInPosts(
+                                userId = userId,
+                                username = currentUsername,
+                                photoUrl = newPhotoUrl,
+                                onComplete = {
+                                    onSuccess()
+                                },
+                                onError = { error ->
+                                    onError(error)
+                                }
+                            )
+                        }
+                        .addOnFailureListener { e ->
+                            onError(e.localizedMessage ?: "Erreur Firestore")
+                        }
+                }.addOnFailureListener { e ->
+                    onError(e.localizedMessage ?: "Erreur URL image")
+                }
             }
-        }.addOnFailureListener { e -> onError(e.localizedMessage ?: "Erreur Storage") }
+            .addOnFailureListener { e ->
+                onError(e.localizedMessage ?: "Erreur Storage")
+            }
     }
 
     fun removePostLocally(postId: String) {

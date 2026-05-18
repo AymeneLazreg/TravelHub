@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import com.example.travelhub.features.travelshare.model.Group
+import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,21 +41,29 @@ fun GroupScreen(
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var showJoinDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
 
     var groupNameInput by remember { mutableStateOf("") }
     var joinGroupNameInput by remember { mutableStateOf("") }
 
-    // État pour la photo du nouveau groupe
     var selectedGroupImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    var groupToEdit by remember { mutableStateOf<Group?>(null) }
+    var editGroupNameInput by remember { mutableStateOf("") }
+    var editGroupImageUri by remember { mutableStateOf<Uri?>(null) }
 
     val userGroups = viewModel.userGroups
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val context = LocalContext.current
 
-    // Sélecteur de photo
     val groupPhotoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = { uri -> selectedGroupImageUri = uri }
+    )
+
+    val editGroupPhotoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+        onResult = { uri -> editGroupImageUri = uri }
     )
 
     LaunchedEffect(Unit) {
@@ -65,8 +73,15 @@ fun GroupScreen(
     Scaffold(
         topBar = {
             LargeTopAppBar(
-                title = { Text("Mes Groupes", fontWeight = FontWeight.ExtraBold) },
-                colors = TopAppBarDefaults.largeTopAppBarColors(containerColor = Color(0xFFF8F9FA))
+                title = {
+                    Text(
+                        text = "Mes Groupes",
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                },
+                colors = TopAppBarDefaults.largeTopAppBarColors(
+                    containerColor = Color(0xFFF8F9FA)
+                )
             )
         },
         floatingActionButton = {
@@ -76,19 +91,27 @@ fun GroupScreen(
                     containerColor = Color.White,
                     contentColor = Color(0xFF1976D2),
                     shape = CircleShape,
-                    modifier = Modifier.padding(bottom = 12.dp).shadow(4.dp, CircleShape)
+                    modifier = Modifier
+                        .padding(bottom = 12.dp)
+                        .shadow(4.dp, CircleShape)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Rechercher un groupe"
-                    )                }
+                    )
+                }
 
                 ExtendedFloatingActionButton(
                     onClick = { showCreateDialog = true },
                     containerColor = Color.Black,
                     contentColor = Color.White,
                     shape = RoundedCornerShape(16.dp),
-                    icon = { Icon(Icons.Default.Add, null) },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null
+                        )
+                    },
                     text = { Text("Créer un groupe") }
                 )
             }
@@ -97,21 +120,39 @@ fun GroupScreen(
     ) { padding ->
 
         if (viewModel.isLoading) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
                 CircularProgressIndicator(color = Color.Black)
             }
         } else if (userGroups.isEmpty()) {
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(Icons.Default.Groups, null, modifier = Modifier.size(80.dp), tint = Color.LightGray)
-                Text("Aucun groupe pour le moment", color = Color.Gray)
+                Icon(
+                    imageVector = Icons.Default.Groups,
+                    contentDescription = null,
+                    modifier = Modifier.size(80.dp),
+                    tint = Color.LightGray
+                )
+
+                Text(
+                    text = "Aucun groupe pour le moment",
+                    color = Color.Gray
+                )
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -121,6 +162,12 @@ fun GroupScreen(
                         isAdmin = group.adminId == currentUserId,
                         onClick = {
                             navController.navigate("group_detail/${group.id}/${group.name}")
+                        },
+                        onEdit = {
+                            groupToEdit = group
+                            editGroupNameInput = group.name
+                            editGroupImageUri = null
+                            showEditDialog = true
                         },
                         onDelete = {
                             viewModel.deleteGroup(group.id) { _, msg ->
@@ -137,7 +184,6 @@ fun GroupScreen(
             }
         }
 
-        // --- DIALOGUE CRÉATION AVEC PHOTO ---
         if (showCreateDialog) {
             AlertDialog(
                 onDismissRequest = { showCreateDialog = false },
@@ -147,21 +193,33 @@ fun GroupScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // Zone de sélection d'image
                         Box(
                             modifier = Modifier
                                 .size(100.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(Color(0xFFF5F5F5))
                                 .clickable {
-                                    groupPhotoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    groupPhotoPicker.launch(
+                                        PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
                                 },
                             contentAlignment = Alignment.Center
                         ) {
                             if (selectedGroupImageUri == null) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.AddAPhoto, null, tint = Color.Gray)
-                                    Text("Photo", fontSize = 12.sp, color = Color.Gray)
+                                    Icon(
+                                        imageVector = Icons.Default.AddAPhoto,
+                                        contentDescription = null,
+                                        tint = Color.Gray
+                                    )
+
+                                    Text(
+                                        text = "Photo",
+                                        fontSize = 12.sp,
+                                        color = Color.Gray
+                                    )
                                 }
                             } else {
                                 AsyncImage(
@@ -185,26 +243,166 @@ fun GroupScreen(
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        if (groupNameInput.isNotBlank()) {
-                            viewModel.createGroup(groupNameInput, selectedGroupImageUri) { success, msg ->
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                if (success) {
-                                    showCreateDialog = false
-                                    groupNameInput = ""
-                                    selectedGroupImageUri = null
+                    TextButton(
+                        onClick = {
+                            if (groupNameInput.isNotBlank()) {
+                                viewModel.createGroup(
+                                    name = groupNameInput,
+                                    imageUri = selectedGroupImageUri
+                                ) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+                                    if (success) {
+                                        showCreateDialog = false
+                                        groupNameInput = ""
+                                        selectedGroupImageUri = null
+                                    }
                                 }
                             }
                         }
-                    }) { Text("Créer", color = Color.Black, fontWeight = FontWeight.Bold) }
+                    ) {
+                        Text(
+                            text = "Créer",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showCreateDialog = false }) { Text("Annuler") }
+                    TextButton(
+                        onClick = {
+                            showCreateDialog = false
+                            groupNameInput = ""
+                            selectedGroupImageUri = null
+                        }
+                    ) {
+                        Text("Annuler")
+                    }
                 }
             )
         }
 
-        // --- DIALOGUE REJOINDRE ---
+        if (showEditDialog && groupToEdit != null) {
+            AlertDialog(
+                onDismissRequest = {
+                    showEditDialog = false
+                    groupToEdit = null
+                    editGroupNameInput = ""
+                    editGroupImageUri = null
+                },
+                title = { Text("Modifier le groupe") },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(110.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFFF5F5F5))
+                                .clickable {
+                                    editGroupPhotoPicker.launch(
+                                        PickVisualMediaRequest(
+                                            ActivityResultContracts.PickVisualMedia.ImageOnly
+                                        )
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                editGroupImageUri != null -> {
+                                    AsyncImage(
+                                        model = editGroupImageUri,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+
+                                groupToEdit!!.imageUrl.isNotEmpty() -> {
+                                    AsyncImage(
+                                        model = groupToEdit!!.imageUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+
+                                else -> {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            imageVector = Icons.Default.AddAPhoto,
+                                            contentDescription = null,
+                                            tint = Color.Gray
+                                        )
+
+                                        Text(
+                                            text = "Changer photo",
+                                            fontSize = 12.sp,
+                                            color = Color.Gray
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        OutlinedTextField(
+                            value = editGroupNameInput,
+                            onValueChange = { editGroupNameInput = it },
+                            label = { Text("Nouveau nom du groupe") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val selectedGroup = groupToEdit
+
+                            if (selectedGroup != null && editGroupNameInput.isNotBlank()) {
+                                viewModel.updateGroup(
+                                    group = selectedGroup,
+                                    newName = editGroupNameInput,
+                                    newImageUri = editGroupImageUri
+                                ) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+                                    if (success) {
+                                        showEditDialog = false
+                                        groupToEdit = null
+                                        editGroupNameInput = ""
+                                        editGroupImageUri = null
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        Text(
+                            text = "Enregistrer",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showEditDialog = false
+                            groupToEdit = null
+                            editGroupNameInput = ""
+                            editGroupImageUri = null
+                        }
+                    ) {
+                        Text("Annuler")
+                    }
+                }
+            )
+        }
+
         if (showJoinDialog) {
             AlertDialog(
                 onDismissRequest = { showJoinDialog = false },
@@ -218,14 +416,35 @@ fun GroupScreen(
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = {
-                        if (joinGroupNameInput.isNotBlank()) {
-                            viewModel.joinGroupByName(joinGroupNameInput) { success, msg ->
-                                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                                if (success) { showJoinDialog = false; joinGroupNameInput = "" }
+                    TextButton(
+                        onClick = {
+                            if (joinGroupNameInput.isNotBlank()) {
+                                viewModel.joinGroupByName(joinGroupNameInput) { success, msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+                                    if (success) {
+                                        showJoinDialog = false
+                                        joinGroupNameInput = ""
+                                    }
+                                }
                             }
                         }
-                    }) { Text("Rejoindre", color = Color.Black) }
+                    ) {
+                        Text(
+                            text = "Rejoindre",
+                            color = Color.Black
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showJoinDialog = false
+                            joinGroupNameInput = ""
+                        }
+                    ) {
+                        Text("Annuler")
+                    }
                 }
             )
         }
@@ -237,13 +456,16 @@ fun ModernGroupItem(
     group: Group,
     isAdmin: Boolean,
     onClick: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     onLeave: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(2.dp)
@@ -252,7 +474,6 @@ fun ModernGroupItem(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // IMAGE DU GROUPE OU ICONE PAR DEFAUT
             Box(
                 modifier = Modifier
                     .size(54.dp)
@@ -269,12 +490,23 @@ fun ModernGroupItem(
                     )
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxSize().background(
-                            Brush.linearGradient(listOf(Color(0xFF64B5F6), Color(0xFF1976D2)))
-                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        Color(0xFF64B5F6),
+                                        Color(0xFF1976D2)
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.Groups, null, tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.Groups,
+                            contentDescription = null,
+                            tint = Color.White
+                        )
                     }
                 }
             }
@@ -282,16 +514,36 @@ fun ModernGroupItem(
             Spacer(modifier = Modifier.width(16.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(group.name, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(
+                    text = group.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                )
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${group.members.size} membres", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        text = "${group.members.size} membres",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+
                     if (isAdmin) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+
                         Surface(
                             color = Color(0xFFE8F5E9),
                             shape = RoundedCornerShape(4.dp)
                         ) {
-                            Text("ADMIN", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFF2E7D32))
+                            Text(
+                                text = "ADMIN",
+                                modifier = Modifier.padding(
+                                    horizontal = 6.dp,
+                                    vertical = 2.dp
+                                ),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF2E7D32)
+                            )
                         }
                     }
                 }
@@ -299,20 +551,64 @@ fun ModernGroupItem(
 
             Box {
                 IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, null, tint = Color.LightGray)
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = null,
+                        tint = Color.LightGray
+                    )
                 }
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
                     if (isAdmin) {
                         DropdownMenuItem(
-                            text = { Text("Supprimer", color = Color.Red) },
-                            onClick = { showMenu = false; onDelete() },
-                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }
+                            text = { Text("Modifier") },
+                            onClick = {
+                                showMenu = false
+                                onEdit()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = null
+                                )
+                            }
+                        )
+
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = "Supprimer",
+                                    color = Color.Red
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onDelete()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Color.Red
+                                )
+                            }
                         )
                     } else {
                         DropdownMenuItem(
                             text = { Text("Quitter") },
-                            onClick = { showMenu = false; onLeave() },
-                            leadingIcon = { Icon(Icons.Default.ExitToApp, null) }
+                            onClick = {
+                                showMenu = false
+                                onLeave()
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.ExitToApp,
+                                    contentDescription = null
+                                )
+                            }
                         )
                     }
                 }

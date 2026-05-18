@@ -29,5 +29,6 @@ data class Post(
 
     // --- INDISPENSABLE POUR L'ITINÉRAIRE ET LA VUE CARTE ---
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+    val fullAddress: String = ""
 )
