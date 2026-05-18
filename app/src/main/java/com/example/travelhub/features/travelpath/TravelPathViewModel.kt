@@ -14,12 +14,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import java.net.URLEncoder
 import java.util.UUID
 
 data class Itinerary(
     val id: String = "",
     val userId: String = "",
     val title: String = "",
+    val description: String = "",
     val price: String = "",
     val effort: String = "",
     val duration: String = "",
@@ -34,7 +36,7 @@ class TravelPathViewModel : ViewModel() {
 
     private val generativeModel = GenerativeModel(
         modelName = "gemini-2.5-flash",
-        apiKey = ""
+        apiKey = "AIzaSyAMGIUpHvvWOt46blmzxHy9TStCpEBmsOo"
     )
 
     var itineraries by mutableStateOf<List<Itinerary>>(emptyList())
@@ -141,7 +143,6 @@ class TravelPathViewModel : ViewModel() {
             try {
                 isSearching = true
 
-                // Calcul du nombre de lieux minimum selon la durée
                 val durationInt = duration.toIntOrNull() ?: 2
                 val minPlaces = when {
                     durationInt <= 2 -> 2
@@ -151,7 +152,6 @@ class TravelPathViewModel : ViewModel() {
                     else -> 8
                 }
 
-                // --- TON PROMPT MAJ ---
                 val prompt = """
                     Tu es un guide local expert et factuel de la destination suivante : $location.
 
@@ -188,21 +188,25 @@ class TravelPathViewModel : ViewModel() {
 
                     CIRCUIT 1
                     TITRE: ...
+                    DESCRIPTION: [Rédige ici une brève description de 2 à 3 phrases maximum présentant l'ambiance et l'objectif de ce circuit]
                     LIEUX: lieu1 | lieu2 | lieu3 | ...
 
                     ---
                     CIRCUIT 2
                     TITRE: ...
+                    DESCRIPTION: [Rédige ici une brève description de 2 à 3 phrases maximum présentant l'ambiance et l'objectif de ce circuit]
                     LIEUX: lieu1 | lieu2 | lieu3 | ...
 
                     ---
                     CIRCUIT 3
                     TITRE: ...
+                    DESCRIPTION: [Rédige ici une brève description de 2 à 3 phrases maximum présentant l'ambiance et l'objectif de ce circuit]
                     LIEUX: lieu1 | lieu2 | lieu3 | ...
 
                     ---
                     CIRCUIT 4
                     TITRE: ...
+                    DESCRIPTION: [Rédige ici une brève description de 2 à 3 phrases maximum présentant l'ambiance et l'objectif de ce circuit]
                     LIEUX: lieu1 | lieu2 | lieu3 | ...
 
                     IMPORTANT FINAL :
@@ -211,21 +215,77 @@ class TravelPathViewModel : ViewModel() {
                 """.trimIndent()
 
                 val response = generativeModel.generateContent(prompt)
-
                 val blocks = response.text?.split("---")?.map { it.trim() }?.filter { it.length > 10 } ?: emptyList()
 
                 val batch = firestore.batch()
                 val newIds = mutableListOf<String>()
 
-                // Nettoyage pour l'URL d'image
-                val imgSearchTag = location.replace(" ", "").replace("(", "").replace(")", "").split(",")[0]
+                val cityName = location.substringBefore(" (").trim()
+
+                val pixabayApiKey = "55908720-cfbf77890c045e7014e956b24"
+                val imageUrls = mutableListOf<String>()
+
+                if (pixabayApiKey.isNotEmpty()) {
+                    try {
+                        withContext(Dispatchers.IO) {
+
+                            val query = URLEncoder.encode(
+                                "$cityName famous landmarks skyline", "UTF-8"
+                            )
+
+                            val url = URL(
+                                "https://pixabay.com/api/?" +
+                                        "key=$pixabayApiKey" +
+                                        "&q=$query" +
+                                        "&image_type=photo" +
+                                        "&category=places" +
+                                        "&orientation=horizontal" +
+                                        "&safesearch=true" +
+                                        "&per_page=10"
+                            )
+
+                            val json = url.readText()
+                            val hits = JSONObject(json).getJSONArray("hits")
+
+                            for (i in 0 until hits.length()) {
+                                val hit = hits.getJSONObject(i)
+
+                                val tags = hit.getString("tags").lowercase()
+
+                                // ✅ filtrage qualité
+                                if (hit.getString("type") == "photo" &&
+                                    (tags.contains(cityName.lowercase()) ||
+                                            tags.contains("landmark") ||
+                                            tags.contains("skyline"))) {
+
+                                    imageUrls.add(hit.getString("largeImageURL"))
+                                }
+
+                                if (imageUrls.size >= 5) break
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+                if (imageUrls.isEmpty()) {
+                    repeat(5) { index ->
+                        val id = System.currentTimeMillis() + index
+                        imageUrls.add("https://loremflickr.com/600/400/$cityName?random=$id")
+                    }
+                }
 
                 blocks.take(5).forEachIndexed { index, block ->
-                    var title = "Circuit à $location"
+                    var title = "Circuit à $cityName"
+                    var description = ""
                     var steps = emptyList<String>()
 
                     block.lines().forEach { line ->
-                        if (line.startsWith("TITRE:")) title = line.removePrefix("TITRE:").trim()
+                        if (line.startsWith("TITRE:")) {
+                            val rawTitle = line.removePrefix("TITRE:").trim()
+                            title = "$cityName : $rawTitle"
+                        }
+                        if (line.startsWith("DESCRIPTION:")) description = line.removePrefix("DESCRIPTION:").trim()
                         if (line.startsWith("LIEUX:")) {
                             steps = line.removePrefix("LIEUX:").split("|").map { it.trim() }.filter { it.isNotEmpty() }
                         }
@@ -235,18 +295,15 @@ class TravelPathViewModel : ViewModel() {
                         val id = UUID.randomUUID().toString()
                         newIds.add(id)
 
-                        // --- LA CORRECTION FINALE IMAGE EST ICI ---
-                        // On crée un identifiant UNIQUE perçu par le serveur pour CHAQUE image.
-                        // System.currentTimeMillis() garantit que ça change à chaque recherche.
-                        // (100..999).random() et index garantissent que les 5 sont différentes entre elles.
-                        val forceNewImageId = System.currentTimeMillis() + (100..999).random() + index
-
-                        // On utilise 'random' au lieu de 'lock' pour forcer le cache busting.
-                        // On simplifie les tags pour plus de diversité de la ville.
-                        val img = "https://loremflickr.com/600/400/$imgSearchTag,travel?random=$forceNewImageId"
+                        // Attribution de l'image (Pixabay si disponible, sinon Picsum)
+                        val img = if (imageUrls.isNotEmpty() && index < imageUrls.size) {
+                            imageUrls[index]
+                        } else {
+                            "https://picsum.photos/seed/${UUID.randomUUID()}/600/400"
+                        }
 
                         batch.set(firestore.collection("itineraries").document(id),
-                            Itinerary(id, userId, title, "~$budget€", effort, "${duration}h", steps, img, false)
+                            Itinerary(id, userId, title, description, "~$budget€", effort, "${duration}h", steps, img, false)
                         )
                     }
                 }
