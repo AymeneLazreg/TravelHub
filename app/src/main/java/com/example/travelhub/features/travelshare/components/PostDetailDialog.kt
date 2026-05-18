@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.Map // NOUVEL IMPORT
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -42,7 +43,8 @@ fun PostDetailDialog(
     onShowLikers: () -> Unit,
     onDeleteClick: () -> Unit,
     onReportClick: () -> Unit,
-    onFavoriteClick: () -> Unit
+    onFavoriteClick: () -> Unit,
+    onCreateItineraryClick: (String) -> Unit // <--- NOUVEAU CALLBACK
 ) {
     var showInternalComments by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -90,7 +92,6 @@ fun PostDetailDialog(
                     onReportClick = onReportClick,
                     showFullDescription = true,
                     onFavoriteClick = onFavoriteClick
-
                 )
 
                 if (post.category.isNotBlank() || post.tags.isNotEmpty()) {
@@ -179,6 +180,38 @@ fun PostDetailDialog(
                     Spacer(Modifier.width(8.dp))
                     Text("Comment y aller", fontWeight = FontWeight.Bold)
                 }
+
+                // --- NOUVEAU BOUTON : CRÉER UN PARCOURS (Version Ville + Pays uniquement) ---
+                Button(
+                    onClick = {
+                        // 1. On découpe l'adresse complète à chaque virgule
+                        val addressParts = post.fullAddress.split(",")
+
+                        // 2. On extrait intelligemment la ville et le pays
+                        val cityAndCountry = if (addressParts.size >= 2) {
+                            // On prend les deux derniers blocs (souvent " 75000 Paris" et " France")
+                            val lastTwo = addressParts.takeLast(2).joinToString(",")
+                            // On efface les chiffres (comme le code postal) pour avoir juste "Paris, France"
+                            lastTwo.replace(Regex("\\d+"), "").trim()
+                        } else {
+                            post.fullAddress // Sécurité si l'adresse est très courte
+                        }
+
+                        // 3. On envoie ce texte propre à la navigation
+                        onCreateItineraryClick(cityAndCountry)
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF212121))
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Créer un parcours ici", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                // -------------------------------------------------------------------------
 
                 val similarPosts = remember(post) { viewModel.getSimilarPosts(post) }
 

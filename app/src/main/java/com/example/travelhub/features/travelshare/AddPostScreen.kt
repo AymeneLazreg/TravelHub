@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.travelhub.features.profile.ProfileViewModel
@@ -46,6 +47,11 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.label.ImageLabeling
 import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.maps.android.compose.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.URL
 import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,6 +74,12 @@ fun AddPostScreen(
 
     var showMapDialog by remember { mutableStateOf(false) }
     var isAnalyzingImage by remember { mutableStateOf(false) }
+
+    // --- VARIABLES POUR L'AUTOCOMPLETE ---
+    var citySuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var expandedCityMenu by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    // -------------------------------------
 
     val categories = listOf(
         "Nature",
@@ -309,36 +321,99 @@ fun AddPostScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        OutlinedTextField(
-            value = locationName,
-            onValueChange = {
-                locationName = it
-                if (fullAddress.isBlank()) {
-                    fullAddress = it
-                }
-            },
-            placeholder = { Text("Ex: Paris, France") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            trailingIcon = {
-                IconButton(
-                    onClick = {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
+        // --- NOUVEAU CHAMP LOCATION AVEC AUTOCOMPLETE ---
+        ExposedDropdownMenuBox(
+            expanded = expandedCityMenu,
+            onExpandedChange = { expandedCityMenu = !expandedCityMenu }
+        ) {
+            OutlinedTextField(
+                value = locationName,
+                onValueChange = { newValue ->
+                    locationName = newValue
+                    if (fullAddress.isBlank()) {
+                        fullAddress = newValue
+                    }
+
+                    if (newValue.length >= 2) {
+                        coroutineScope.launch(Dispatchers.IO) {
+                            try {
+                                val safeQuery = newValue.replace(" ", "+")
+                                val url = URL("https://photon.komoot.io/api/?q=$safeQuery&layer=city&limit=5")
+                                val jsonString = url.readText()
+                                val jsonObject = JSONObject(jsonString)
+                                val features = jsonObject.getJSONArray("features")
+
+                                val results = mutableListOf<String>()
+
+                                for (i in 0 until features.length()) {
+                                    val properties = features.getJSONObject(i).getJSONObject("properties")
+                                    val name = properties.optString("name", "")
+                                    val country = properties.optString("country", "")
+
+                                    if (name.isNotEmpty()) {
+                                        val displayName = if (country.isNotEmpty()) "$name, $country" else name
+                                        if (!results.contains(displayName)) {
+                                            results.add(displayName)
+                                        }
+                                    }
+                                }
+
+                                withContext(Dispatchers.Main) {
+                                    citySuggestions = results
+                                    expandedCityMenu = results.isNotEmpty()
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    } else {
+                        expandedCityMenu = false
+                    }
+                },
+                placeholder = { Text("Ex: Paris, France") },
+                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                shape = RoundedCornerShape(8.dp),
+                trailingIcon = {
+                    IconButton(
+                        onClick = {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
                             )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = "Carte",
+                            tint = Color(0xFF2196F3)
                         )
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = "Carte",
-                        tint = Color(0xFF2196F3)
+                }
+            )
+
+            DropdownMenu(
+                expanded = expandedCityMenu && citySuggestions.isNotEmpty(),
+                onDismissRequest = { expandedCityMenu = false },
+                modifier = Modifier
+                    .background(Color.White)
+                    .exposedDropdownSize(),
+                properties = PopupProperties(focusable = false)
+            ) {
+                citySuggestions.forEach { suggestion ->
+                    DropdownMenuItem(
+                        text = { Text(suggestion) },
+                        onClick = {
+                            locationName = suggestion
+                            fullAddress = suggestion
+                            expandedCityMenu = false
+                        }
                     )
                 }
             }
-        )
+        }
+        // ------------------------------------------------
 
         Spacer(modifier = Modifier.height(16.dp))
 

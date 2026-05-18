@@ -47,9 +47,7 @@ fun NavGraph() {
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate("home") {
-                        popUpTo("login") {
-                            inclusive = true
-                        }
+                        popUpTo("login") { inclusive = true }
                     }
                 },
                 onNavigateToRegister = {
@@ -57,9 +55,7 @@ fun NavGraph() {
                 },
                 onAnonymousClick = {
                     navController.navigate("home") {
-                        popUpTo("login") {
-                            inclusive = true
-                        }
+                        popUpTo("login") { inclusive = true }
                     }
                 }
             )
@@ -69,9 +65,7 @@ fun NavGraph() {
             RegisterScreen(
                 onRegisterSuccess = {
                     navController.navigate("home") {
-                        popUpTo("login") {
-                            inclusive = true
-                        }
+                        popUpTo("login") { inclusive = true }
                     }
                 },
                 onBackToLogin = {
@@ -108,24 +102,27 @@ fun NavGraph() {
                 groupName = groupName,
                 viewModel = postViewModel,
                 profileViewModel = profileViewModel,
-                onBack = {
-                    navController.popBackStack()
-                },
-                onUserClick = { userId ->
-                    navController.navigate("other_profile/$userId")
-                }
+                onBack = { navController.popBackStack() },
+                onUserClick = { userId -> navController.navigate("other_profile/$userId") }
             )
         }
 
-        // --- TRAVELPATH ---
-        composable("travel_preferences") {
+        // --- TRAVELPATH (MODIFIÉ POUR ACCEPTER LA VILLE) ---
+        composable(
+            route = "travel_preferences?city={city}",
+            arguments = listOf(
+                navArgument("city") {
+                    type = NavType.StringType
+                    defaultValue = "" // Vide par défaut si on vient du menu normal
+                }
+            )
+        ) { backStackEntry ->
+            val city = backStackEntry.arguments?.getString("city") ?: ""
+
             TravelPathPreferencesScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onGenerateClick = {
-                    navController.popBackStack()
-                },
+                initialLocation = city, // On passe la ville à l'écran !
+                onBackClick = { navController.popBackStack() },
+                onGenerateClick = { navController.popBackStack() },
                 travelPathViewModel = sharedTravelViewModel
             )
         }
@@ -135,9 +132,7 @@ fun NavGraph() {
 
             ItineraryDetailScreen(
                 itineraryId = id,
-                onBackClick = {
-                    navController.popBackStack()
-                },
+                onBackClick = { navController.popBackStack() },
                 travelPathViewModel = sharedTravelViewModel
             )
         }
@@ -145,11 +140,7 @@ fun NavGraph() {
         // --- TRAVELSHARE & PROFILS ---
         composable(
             route = "other_profile/{userId}",
-            arguments = listOf(
-                navArgument("userId") {
-                    type = NavType.StringType
-                }
-            )
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             val otherProfileViewModel: OtherProfileViewModel = viewModel()
@@ -158,29 +149,21 @@ fun NavGraph() {
                 userId = userId,
                 viewModel = otherProfileViewModel,
                 postViewModel = postViewModel,
-                onBackClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() }
             )
         }
 
         composable("notifications") {
             NotificationsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
+                onBackClick = { navController.popBackStack() },
                 viewModel = notificationViewModel,
-                onUserClick = { userId ->
-                    navController.navigate("other_profile/$userId")
-                },
+                onUserClick = { userId -> navController.navigate("other_profile/$userId") },
                 onNotificationContentClick = { notification ->
                     postViewModel.selectedPostIdFromNotif = notification.postId
                     postViewModel.shouldOpenCommentsFromNotif = notification.type == "COMMENT"
 
                     navController.navigate("home") {
-                        popUpTo("home") {
-                            inclusive = true
-                        }
+                        popUpTo("home") { inclusive = true }
                     }
                 }
             )
@@ -188,12 +171,8 @@ fun NavGraph() {
 
         composable("edit_profile") {
             EditProfileScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onSaveClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() },
+                onSaveClick = { navController.popBackStack() }
             )
         }
     }

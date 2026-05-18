@@ -35,7 +35,8 @@ fun ProfileScreen(
     onLogoutClick: () -> Unit,
     profileViewModel: ProfileViewModel,
     postViewModel: PostViewModel,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onCreateItineraryClick: (String) -> Unit = {} // <--- 1. AJOUTÉ ICI
 ) {
     val userProfile = profileViewModel.userProfile
     val isLoading = profileViewModel.isLoading
@@ -100,8 +101,6 @@ fun ProfileScreen(
 
                 Text(text = "${userProfile.prenom} ${userProfile.nom}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(text = userProfile.bio, fontSize = 14.sp)
-
-                // LA LIGNE PARASITE A ÉTÉ SUPPRIMÉE ICI
 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                     Icon(Icons.Default.LocationOn, modifier = Modifier.size(16.dp), contentDescription = null, tint = Color.Gray)
@@ -176,7 +175,7 @@ fun ProfileScreen(
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { /* Action gérée dans le Dialog */ },
-            onUserClick = onUserClick, // Cette ligne-là est la bonne !
+            onUserClick = onUserClick,
             onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
             onDeleteClick = {
                 selectedPostForDetail = null
@@ -184,7 +183,8 @@ fun ProfileScreen(
                 profileViewModel.removePostLocally(post.id)
             },
             onReportClick = { postViewModel.reportPost(post) },
-            onFavoriteClick = { postViewModel.toggleFavorite(post.id) }
+            onFavoriteClick = { postViewModel.toggleFavorite(post.id) },
+            onCreateItineraryClick = onCreateItineraryClick // <--- 2. CONNECTÉ ICI
         )
     }
 }

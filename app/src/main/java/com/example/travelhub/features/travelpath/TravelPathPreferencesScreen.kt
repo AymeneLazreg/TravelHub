@@ -28,6 +28,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TravelPathPreferencesScreen(
+    initialLocation: String = "", // <--- NOUVEAU PARAMÈTRE ICI
     onBackClick: () -> Unit,
     onGenerateClick: () -> Unit,
     travelPathViewModel: TravelPathViewModel = viewModel()
@@ -35,7 +36,8 @@ fun TravelPathPreferencesScreen(
     val context = LocalContext.current
     val citySuggestions = travelPathViewModel.citySuggestions
 
-    var locationInput by remember { mutableStateOf("") } // Changé de 'ville' à 'locationInput'
+    // <--- MODIFIÉ : On utilise la ville reçue pour préremplir le champ
+    var locationInput by remember { mutableStateOf(initialLocation) }
     var expanded by remember { mutableStateOf(false) }
 
     var budget by remember { mutableStateOf("") }
@@ -99,7 +101,7 @@ fun TravelPathPreferencesScreen(
                     DropdownMenuItem(
                         text = { Text(suggestion) },
                         onClick = {
-                            locationInput = suggestion // On garde le format "Ville (Pays)"
+                            locationInput = suggestion
                             expanded = false
                         }
                     )

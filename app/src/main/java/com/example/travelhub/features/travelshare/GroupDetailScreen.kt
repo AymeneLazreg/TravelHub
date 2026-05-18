@@ -27,9 +27,10 @@ fun GroupDetailScreen(
     viewModel: PostViewModel,
     profileViewModel: ProfileViewModel,
     onBack: () -> Unit,
-    onUserClick: (String) -> Unit
+    onUserClick: (String) -> Unit,
+    onCreateItineraryClick: (String) -> Unit = {} // <--- 1. PARAMÈTRE AJOUTÉ ICI
 ) {
-    // Filtrer les posts pour ce groupe dès l'ouverture [cite: 18, 42]
+    // Filtrer les posts pour ce groupe dès l'ouverture
     LaunchedEffect(groupId) {
         viewModel.filterByGroup(groupId)
     }
@@ -75,14 +76,14 @@ fun GroupDetailScreen(
                             isFavorite = userProfile.favorites.contains(post.id),
                             onLikeClick = { viewModel.toggleLike(post) },
                             onCommentClick = {
-                                selectedPostId = post.id // Ouvre le détail pour voir les commentaires [cite: 37]
+                                selectedPostId = post.id // Ouvre le détail pour voir les commentaires
                             },
                             onUserClick = onUserClick,
                             onGroupClick = { _, _ -> /* Déjà dans le groupe */ },
                             onImageClick = { selectedPostId = post.id }, // Déclenche l'ouverture du dialogue
                             onShowLikers = { viewModel.fetchLikersDetails(post.likedBy) },
                             onDeleteClick = { viewModel.deletePost(post) },
-                            onReportClick = { viewModel.reportPost(post) }, // Option de signalement [cite: 15, 36]
+                            onReportClick = { viewModel.reportPost(post) }, // Option de signalement
                             onFavoriteClick = { viewModel.toggleFavorite(post.id) }
                         )
                     }
@@ -92,7 +93,6 @@ fun GroupDetailScreen(
     }
 
     // --- AFFICHAGE DE LA FICHE DÉTAILLÉE ---
-    // Cette partie permet d'afficher les infos du lieu, la date et le bouton itinéraire [cite: 14, 20, 44]
     if (selectedPost != null) {
         PostDetailDialog(
             post = selectedPost,
@@ -108,7 +108,8 @@ fun GroupDetailScreen(
                 selectedPostId = null
             },
             onReportClick = { viewModel.reportPost(selectedPost) },
-            onFavoriteClick = { viewModel.toggleFavorite(selectedPost.id) }
+            onFavoriteClick = { viewModel.toggleFavorite(selectedPost.id) },
+            onCreateItineraryClick = onCreateItineraryClick // <--- 2. CONNECTÉ ICI
         )
     }
 }

@@ -33,7 +33,8 @@ fun OtherProfileScreen(
     userId: String,
     viewModel: OtherProfileViewModel,
     postViewModel: PostViewModel,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit, // <--- VIRGULE AJOUTÉE ICI
+    onCreateItineraryClick: (String) -> Unit = {}
 ) {
     LaunchedEffect(userId) {
         viewModel.loadUser(userId)
@@ -165,7 +166,7 @@ fun OtherProfileScreen(
         PostDetailDialog(
             post = post,
             isFavorite = userProfile.favorites.contains(post.id),
-            viewModel = postViewModel, // <--- AJOUTÉ ICI POUR RÉGLER L'ERREUR
+            viewModel = postViewModel,
             onDismiss = { selectedPostForDetail = null },
             onLikeClick = { postViewModel.toggleLike(post) },
             onCommentClick = { },
@@ -173,7 +174,8 @@ fun OtherProfileScreen(
             onShowLikers = { postViewModel.fetchLikersDetails(post.likedBy) },
             onDeleteClick = { },
             onReportClick = { postViewModel.reportPost(post) },
-            onFavoriteClick = { postViewModel.toggleFavorite(post.id) }
+            onFavoriteClick = { postViewModel.toggleFavorite(post.id) },
+            onCreateItineraryClick = onCreateItineraryClick // <--- AJOUTÉ ICI
         )
     }
 }

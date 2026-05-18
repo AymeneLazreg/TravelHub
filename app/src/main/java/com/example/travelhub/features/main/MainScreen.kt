@@ -44,7 +44,7 @@ fun MainScreen(
     profileViewModel: ProfileViewModel,
     groupViewModel: GroupViewModel
 ) {
-    // Vérification de l'état de connexion (null = anonyme) [cite: 12, 17]
+    // Vérification de l'état de connexion (null = anonyme)
     val currentUser = remember { FirebaseAuth.getInstance().currentUser }
     val currentUserId = currentUser?.uid
     val isAnonymous = currentUser == null
@@ -61,7 +61,7 @@ fun MainScreen(
     var currentRoute by rememberSaveable { mutableStateOf("accueil") }
 
     // --- LOGIQUE DE FILTRAGE DES ONGLETS (MODE ANONYME) ---
-    // On définit les items de base accessibles à tous [cite: 23, 69]
+    // On définit les items de base accessibles à tous
     val items = remember(isAnonymous) {
         val baseItems = mutableListOf(
             BottomNavItem("Accueil", "accueil", Icons.Default.Home),
@@ -75,7 +75,7 @@ fun MainScreen(
             baseItems.add(BottomNavItem("Profil", "profil", Icons.Default.Person))
         }
 
-        // L'onglet "Voyager" (Passerelle) reste accessible pour l'intégration globale [cite: 3, 69]
+        // L'onglet "Voyager" (Passerelle) reste accessible pour l'intégration globale
         baseItems.add(BottomNavItem("Voyager", "voyager", Icons.Default.Flight))
         baseItems
     }
@@ -133,11 +133,15 @@ fun MainScreen(
                         }
                     },
                     onMapClick = {
-                        // La vue carte (pins) est accessible en mode anonyme [cite: 23, 33]
+                        // La vue carte (pins) est accessible en mode anonyme
                         navController.navigate("map_explorer")
+                    },
+                    // --- 1. AJOUT DE LA NAVIGATION ICI POUR HOMESCREEN ---
+                    onCreateItineraryClick = { ville ->
+                        navController.navigate("travel_preferences?city=$ville")
                     }
                 )
-                "recherche" -> SearchScreen() // Accessible en anonyme [cite: 13, 23, 29]
+                "recherche" -> SearchScreen() // Accessible en anonyme
 
                 "ajout" -> if (!isAnonymous) {
                     AddPostScreen(
@@ -171,6 +175,10 @@ fun MainScreen(
                             if (userId != currentUserId) {
                                 navController.navigate("other_profile/$userId")
                             }
+                        },
+                        // --- 2. AJOUT DE LA NAVIGATION ICI POUR PROFILESCREEN ---
+                        onCreateItineraryClick = { ville ->
+                            navController.navigate("travel_preferences?city=$ville")
                         }
                     )
                 }

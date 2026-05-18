@@ -36,7 +36,8 @@ fun HomeScreen(
     onNotificationsClick: () -> Unit,
     onUserClick: (String) -> Unit,
     onGroupClick: (String, String) -> Unit,
-    onMapClick: () -> Unit
+    onMapClick: () -> Unit,
+    onCreateItineraryClick: (String) -> Unit = {} // <--- 1. AJOUTÉ ICI
 ) {
     val isAnonymous = remember { FirebaseAuth.getInstance().currentUser == null }
 
@@ -244,7 +245,8 @@ fun HomeScreen(
                 if (!isAnonymous) {
                     viewModel.toggleFavorite(selectedPost.id)
                 }
-            }
+            },
+            onCreateItineraryClick = onCreateItineraryClick // <--- 2. CONNECTÉ ICI
         )
     }
 }
