@@ -252,7 +252,7 @@ class TravelPathViewModel : ViewModel() {
 
                                 val tags = hit.getString("tags").lowercase()
 
-                                // ✅ filtrage qualité
+                                // ✅ filtrage qualite
                                 if (hit.getString("type") == "photo" &&
                                     (tags.contains(cityName.lowercase()) ||
                                             tags.contains("landmark") ||

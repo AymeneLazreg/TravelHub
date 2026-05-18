@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.print.PrintAttributes
+import androidx.core.net.toUri
 import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,7 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.*
@@ -67,7 +68,7 @@ fun ItineraryDetailScreen(
                         .padding(16.dp)
                         .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(50))
                 ) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Retour", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = Color.White)
                 }
             }
 
@@ -119,7 +120,7 @@ fun ItineraryDetailScreen(
                             onClick = {
                                 val cityName = itinerary.title.substringBefore(" :")
                                 val searchQuery = Uri.encode("$step, $cityName")
-                                val mapUri = Uri.parse("geo:0,0?q=$searchQuery")
+                                val mapUri = "geo:0,0?q=$searchQuery".toUri()
                                 val mapIntent = Intent(Intent.ACTION_VIEW, mapUri)
                                 context.startActivity(mapIntent)
                             }
@@ -143,7 +144,7 @@ fun ItineraryDetailScreen(
                             val waypointsString = waypointsList.joinToString("|") { Uri.encode("$it, $cityName") }
                             val waypointsParam = if (waypointsString.isNotEmpty()) "&waypoints=$waypointsString" else ""
 
-                            val routeUri = Uri.parse("https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination$waypointsParam&travelmode=walking")
+                            val routeUri = "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination$waypointsParam&travelmode=walking".toUri()
                             val routeIntent = Intent(Intent.ACTION_VIEW, routeUri)
                             context.startActivity(routeIntent)
                         },
@@ -202,7 +203,7 @@ fun exportItineraryToPdf(context: Context, itinerary: Itinerary) {
                 <span class="badge">Effort : ${itinerary.effort}</span>
             </div>
             <div class="description">${itinerary.description}</div>
-            <h2>Étapes du parcours</h2>
+            <h2>Etapes du parcours</h2>
             ${itinerary.steps.mapIndexed { index, step ->
         """<div class="step"><span class="step-number">Étape ${index + 1} :</span> $step</div>"""
     }.joinToString("")}
