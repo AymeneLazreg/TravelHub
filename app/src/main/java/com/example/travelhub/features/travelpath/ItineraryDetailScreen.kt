@@ -132,7 +132,7 @@ fun ItineraryDetailScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Bouton pour tracer l'itinéraire complet
+                // Bouton pour tracer l'itinéeraire complet
                 if (itinerary.steps.size >= 2) {
                     Button(
                         onClick = {

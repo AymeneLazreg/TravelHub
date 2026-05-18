@@ -315,7 +315,7 @@ class TravelPathViewModel : ViewModel() {
                     }.addOnFailureListener { onError(it.message ?: "Erreur base de données") }
                 } else {
                     isSearching = false
-                    onError("L'IA n'a pas réussi à générer assez d'itinéraires fiables pour $location. Modifiez légèrement la durée ou le budget et réessayez.")
+                    onError("L'Ia n'a pas réussi à générer assez d'itinéraires fiables pour $location. Modifiez légèrement la durée ou le budget et réessayez.")
                 }
 
             } catch (e: Exception) {
