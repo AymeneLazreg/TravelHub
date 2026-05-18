@@ -88,7 +88,9 @@ fun PostDetailDialog(
                     onShowLikers = onShowLikers,
                     onDeleteClick = onDeleteClick,
                     onReportClick = onReportClick,
+                    showFullDescription = true,
                     onFavoriteClick = onFavoriteClick
+
                 )
 
                 if (post.category.isNotBlank() || post.tags.isNotEmpty()) {

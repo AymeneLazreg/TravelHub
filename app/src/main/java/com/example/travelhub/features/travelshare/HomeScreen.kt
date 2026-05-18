@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -39,7 +38,6 @@ fun HomeScreen(
     onGroupClick: (String, String) -> Unit,
     onMapClick: () -> Unit
 ) {
-    // Vérification du mode anonyme
     val isAnonymous = remember { FirebaseAuth.getInstance().currentUser == null }
 
     val posts by viewModel.filteredPosts.collectAsState()
@@ -54,7 +52,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.filterByGroup(null)
-        // On ne charge les groupes que si l'utilisateur est connecté
+
         if (!isAnonymous) {
             groupViewModel.fetchUserGroups()
         }
@@ -62,11 +60,14 @@ fun HomeScreen(
 
     LaunchedEffect(viewModel.selectedPostIdFromNotif) {
         val postIdFromNotif = viewModel.selectedPostIdFromNotif
+
         if (postIdFromNotif != null) {
             selectedPostId = postIdFromNotif
+
             if (viewModel.shouldOpenCommentsFromNotif) {
                 delay(600)
             }
+
             viewModel.clearNavigationRequest()
         }
     }
@@ -78,7 +79,6 @@ fun HomeScreen(
                 .padding(padding)
                 .background(Color.White)
         ) {
-            // --- HEADER ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -86,25 +86,24 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("TravelShare", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // BOUTON CARTE
-                    IconButton(onClick = onMapClick) {
-                        Icon(
-                            imageVector = Icons.Default.Map,
-                            contentDescription = "Voir la carte",
-                            tint = Color.Black
-                        )
-                    }
+                Text(
+                    text = "TravelShare",
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
 
-                    // BOUTON NOTIFICATIONS (Masqué si anonyme)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (!isAnonymous) {
                         IconButton(onClick = onNotificationsClick) {
                             BadgedBox(
-                                badge = { if (hasUnread) Badge(containerColor = Color.Red) }
+                                badge = {
+                                    if (hasUnread) {
+                                        Badge(containerColor = Color.Red)
+                                    }
+                                }
                             ) {
                                 Icon(
-                                    Icons.Outlined.Notifications,
+                                    imageVector = Icons.Outlined.Notifications,
                                     contentDescription = "Notifications",
                                     tint = Color.Black
                                 )
@@ -114,21 +113,28 @@ fun HomeScreen(
                 }
             }
 
-            // --- LISTE DES POSTS ---
             if (posts.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Aucune publication pour le moment", color = Color.Gray)
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Aucune publication pour le moment",
+                        color = Color.Gray
+                    )
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(posts, key = { it.id }) { post ->
                         val isFavorite = userProfile.favorites.contains(post.id)
+
                         PostItem(
                             post = post,
                             isFavorite = isFavorite,
                             onLikeClick = {
-                                // Action bloquée si anonyme
-                                if (!isAnonymous) viewModel.toggleLike(post)
+                                if (!isAnonymous) {
+                                    viewModel.toggleLike(post)
+                                }
                             },
                             onCommentClick = {
                                 selectedPostId = post.id
@@ -136,7 +142,9 @@ fun HomeScreen(
                             },
                             onUserClick = onUserClick,
                             onGroupClick = onGroupClick,
-                            onImageClick = { selectedPostId = post.id },
+                            onImageClick = {
+                                selectedPostId = post.id
+                            },
                             onShowLikers = {
                                 viewModel.fetchLikersDetails(post.likedBy)
                                 showLikersSheet = true
@@ -149,54 +157,72 @@ fun HomeScreen(
                                 }
                             },
                             onReportClick = {
-                                if (!isAnonymous) viewModel.reportPost(post)
+                                if (!isAnonymous) {
+                                    viewModel.reportPost(post)
+                                }
                             },
                             onFavoriteClick = {
-                                if (!isAnonymous) viewModel.toggleFavorite(post.id)
+                                if (!isAnonymous) {
+                                    viewModel.toggleFavorite(post.id)
+                                }
                             }
                         )
                     }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
+
+                    item {
+                        Spacer(modifier = Modifier.height(80.dp))
+                    }
                 }
             }
         }
     }
 
-    // Gestion des dialogues (BottomSheet pour commentaires et likes)
     if (showCommentsSheet && selectedPost != null) {
         ModalBottomSheet(
             onDismissRequest = { showCommentsSheet = false },
             containerColor = Color.White
         ) {
-            // Le composant Comments devra gérer le masquage du champ d'écriture si isAnonymous
-            Comments(post = selectedPost, viewModel = viewModel, onUserClick = onUserClick)
+            Comments(
+                post = selectedPost,
+                viewModel = viewModel,
+                onUserClick = onUserClick
+            )
         }
     }
 
     if (showLikersSheet) {
         val likers by viewModel.likersDetails.collectAsState()
+
         ModalBottomSheet(
             onDismissRequest = { showLikersSheet = false },
             containerColor = Color.White
         ) {
-            Likes(likers = likers, onUserClick = { userId ->
-                showLikersSheet = false
-                onUserClick(userId)
-            })
+            Likes(
+                likers = likers,
+                onUserClick = { userId ->
+                    showLikersSheet = false
+                    onUserClick(userId)
+                }
+            )
         }
     }
 
-    // Dialogue de détail du post
     if (selectedPost != null && !showCommentsSheet && !showLikersSheet) {
         PostDetailDialog(
             post = selectedPost,
             isFavorite = userProfile.favorites.contains(selectedPost.id),
             viewModel = viewModel,
-            onDismiss = { selectedPostId = null },
-            onLikeClick = {
-                if (!isAnonymous) viewModel.toggleLike(selectedPost)
+            onDismiss = {
+                selectedPostId = null
             },
-            onCommentClick = { showCommentsSheet = true },
+            onLikeClick = {
+                if (!isAnonymous) {
+                    viewModel.toggleLike(selectedPost)
+                }
+            },
+            onCommentClick = {
+                showCommentsSheet = true
+            },
             onUserClick = onUserClick,
             onShowLikers = {
                 viewModel.fetchLikersDetails(selectedPost.likedBy)
@@ -210,10 +236,14 @@ fun HomeScreen(
                 }
             },
             onReportClick = {
-                if (!isAnonymous) viewModel.reportPost(selectedPost)
+                if (!isAnonymous) {
+                    viewModel.reportPost(selectedPost)
+                }
             },
             onFavoriteClick = {
-                if (!isAnonymous) viewModel.toggleFavorite(selectedPost.id)
+                if (!isAnonymous) {
+                    viewModel.toggleFavorite(selectedPost.id)
+                }
             }
         )
     }

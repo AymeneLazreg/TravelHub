@@ -1,13 +1,19 @@
 package com.example.travelhub.features.auth
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState // <-- IMPORT CRITIQUE
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -23,11 +29,8 @@ fun LoginScreen(
     onAnonymousClick: () -> Unit,
     authViewModel: AuthViewModel = viewModel()
 ) {
-    // 1. On récupère l'email sauvegardé depuis le ViewModel
     val savedEmail by authViewModel.savedEmail.observeAsState("")
 
-    // 2. On initialise le champ email avec la valeur sauvegardée
-    // Le remember(savedEmail) permet de rafraîchir le champ dès que savedEmail change
     var email by remember(savedEmail) { mutableStateOf(savedEmail ?: "") }
     var password by remember { mutableStateOf("") }
 
@@ -41,14 +44,31 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Box(
+            modifier = Modifier
+                .size(90.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFE9ECF8)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Public,
+                contentDescription = "Travel logo",
+                tint = Color(0xFF53649A),
+                modifier = Modifier.size(52.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Text(
             text = "Traveling",
             fontSize = 40.sp,
             fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFF2F313A),
             modifier = Modifier.padding(bottom = 48.dp)
         )
 
-        // Champ Email (rempli automatiquement si savedEmail existe)
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -76,29 +96,53 @@ fun LoginScreen(
             onClick = {
                 if (email.isNotEmpty() && password.isNotEmpty()) {
                     isLoading = true
+
                     authViewModel.loginUser(
                         email = email.trim(),
                         pass = password.trim(),
                         onSuccess = {
                             isLoading = false
-                            Toast.makeText(context, "Connexion réussie !", Toast.LENGTH_SHORT).show()
+
+                            Toast.makeText(
+                                context,
+                                "Connexion réussie !",
+                                Toast.LENGTH_SHORT
+                            ).show()
+
                             onLoginSuccess()
                         },
                         onError = { errorMessage ->
                             isLoading = false
-                            Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+
+                            Toast.makeText(
+                                context,
+                                errorMessage,
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     )
                 } else {
-                    Toast.makeText(context, "Veuillez remplir tous les champs", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Veuillez remplir tous les champs",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
             shape = MaterialTheme.shapes.medium,
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF53649A)
+            )
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(24.dp))
+                CircularProgressIndicator(
+                    color = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
             } else {
                 Text("Se connecter")
             }
@@ -106,14 +150,26 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        TextButton(onClick = onNavigateToRegister, enabled = !isLoading) {
-            Text("Pas de compte ? S'inscrire")
+        TextButton(
+            onClick = onNavigateToRegister,
+            enabled = !isLoading
+        ) {
+            Text(
+                text = "Pas de compte ? S'inscrire",
+                color = Color(0xFF34446F)
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        TextButton(onClick = onAnonymousClick, enabled = !isLoading) {
-            Text("Continuer en mode anonyme", color = MaterialTheme.colorScheme.secondary)
+        TextButton(
+            onClick = onAnonymousClick,
+            enabled = !isLoading
+        ) {
+            Text(
+                text = "Continuer en mode anonyme",
+                color = Color(0xFF34446F)
+            )
         }
     }
 }

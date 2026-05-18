@@ -22,12 +22,10 @@ import com.example.travelhub.features.profile.ProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileViewModel
 import com.example.travelhub.features.profile.OtherProfileScreen
 import com.example.travelhub.features.travelshare.NotificationsScreen
-import com.example.travelhub.features.travelshare.GroupScreen
-import com.example.travelhub.features.travelshare.GroupDetailScreen // IMPORTÉ
+import com.example.travelhub.features.travelshare.GroupDetailScreen
 import com.example.travelhub.features.travelshare.viewmodel.NotificationViewModel
 import com.example.travelhub.features.travelshare.viewmodel.PostViewModel
 import com.example.travelhub.features.travelshare.viewmodel.GroupViewModel
-import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun NavGraph() {
@@ -49,18 +47,36 @@ fun NavGraph() {
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate("home") {
-                        popUpTo("login") { inclusive = true }
+                        popUpTo("login") {
+                            inclusive = true
+                        }
                     }
                 },
-                onNavigateToRegister = { navController.navigate("register") },
-                onAnonymousClick = { navController.navigate("home") }
+                onNavigateToRegister = {
+                    navController.navigate("register")
+                },
+                onAnonymousClick = {
+                    navController.navigate("home") {
+                        popUpTo("login") {
+                            inclusive = true
+                        }
+                    }
+                }
             )
         }
 
         composable("register") {
             RegisterScreen(
-                onRegisterSuccess = { navController.navigate("login") },
-                onBackToLogin = { navController.popBackStack() }
+                onRegisterSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("login") {
+                            inclusive = true
+                        }
+                    }
+                },
+                onBackToLogin = {
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -92,7 +108,9 @@ fun NavGraph() {
                 groupName = groupName,
                 viewModel = postViewModel,
                 profileViewModel = profileViewModel,
-                onBack = { navController.popBackStack() },
+                onBack = {
+                    navController.popBackStack()
+                },
                 onUserClick = { userId ->
                     navController.navigate("other_profile/$userId")
                 }
@@ -102,17 +120,24 @@ fun NavGraph() {
         // --- TRAVELPATH ---
         composable("travel_preferences") {
             TravelPathPreferencesScreen(
-                onBackClick = { navController.popBackStack() },
-                onGenerateClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onGenerateClick = {
+                    navController.popBackStack()
+                },
                 travelPathViewModel = sharedTravelViewModel
             )
         }
 
         composable("itinerary_detail/{id}") { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: ""
+
             ItineraryDetailScreen(
                 itineraryId = id,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 travelPathViewModel = sharedTravelViewModel
             )
         }
@@ -120,7 +145,11 @@ fun NavGraph() {
         // --- TRAVELSHARE & PROFILS ---
         composable(
             route = "other_profile/{userId}",
-            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("userId") {
+                    type = NavType.StringType
+                }
+            )
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
             val otherProfileViewModel: OtherProfileViewModel = viewModel()
@@ -129,22 +158,29 @@ fun NavGraph() {
                 userId = userId,
                 viewModel = otherProfileViewModel,
                 postViewModel = postViewModel,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                }
             )
         }
 
         composable("notifications") {
             NotificationsScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    navController.popBackStack()
+                },
                 viewModel = notificationViewModel,
                 onUserClick = { userId ->
                     navController.navigate("other_profile/$userId")
                 },
                 onNotificationContentClick = { notification ->
                     postViewModel.selectedPostIdFromNotif = notification.postId
-                    postViewModel.shouldOpenCommentsFromNotif = (notification.type == "COMMENT")
+                    postViewModel.shouldOpenCommentsFromNotif = notification.type == "COMMENT"
+
                     navController.navigate("home") {
-                        popUpTo("home") { inclusive = true }
+                        popUpTo("home") {
+                            inclusive = true
+                        }
                     }
                 }
             )
@@ -152,8 +188,12 @@ fun NavGraph() {
 
         composable("edit_profile") {
             EditProfileScreen(
-                onBackClick = { navController.popBackStack() },
-                onSaveClick = { navController.popBackStack() }
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onSaveClick = {
+                    navController.popBackStack()
+                }
             )
         }
     }

@@ -42,6 +42,9 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import com.google.maps.android.compose.*
 import java.util.*
 
@@ -64,6 +67,7 @@ fun AddPostScreen(
     var expandedMenu by remember { mutableStateOf(false) }
 
     var showMapDialog by remember { mutableStateOf(false) }
+    var isAnalyzingImage by remember { mutableStateOf(false) }
 
     val categories = listOf(
         "Nature",
@@ -79,6 +83,7 @@ fun AddPostScreen(
         "Montagne",
         "Événement"
     )
+
     var selectedCategory by remember { mutableStateOf("") }
 
     var tagInput by remember { mutableStateOf("") }
@@ -171,7 +176,49 @@ fun AddPostScreen(
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> selectedImageUri = uri }
+        onResult = { uri ->
+            selectedImageUri = uri
+
+            if (uri != null) {
+                isAnalyzingImage = true
+
+                generateTagsFromImage(
+                    context = context,
+                    imageUri = uri,
+                    onTagsDetected = { detectedTags ->
+                        detectedTags.forEach { tag ->
+                            val alreadyExists = selectedTags.any {
+                                it.equals(tag, ignoreCase = true)
+                            }
+
+                            if (!alreadyExists) {
+                                selectedTags.add(tag)
+                            }
+                        }
+
+                        isAnalyzingImage = false
+
+                        if (detectedTags.isNotEmpty()) {
+                            Toast.makeText(
+                                context,
+                                "Tags proposés automatiquement",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Aucun tag automatique trouvé",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    onError = { error ->
+                        isAnalyzingImage = false
+                        Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
     )
 
     LaunchedEffect(Unit) {
@@ -227,6 +274,29 @@ fun AddPostScreen(
                         .fillMaxSize()
                         .clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop
+                )
+            }
+        }
+
+        if (isAnalyzingImage) {
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(0xFF2196F3)
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = "Analyse de l'image en cours...",
+                    fontSize = 13.sp,
+                    color = Color.DarkGray
                 )
             }
         }
@@ -337,7 +407,11 @@ fun AddPostScreen(
                     onClick = {
                         val cleanTag = tagInput.trim()
 
-                        if (cleanTag.isNotBlank() && !selectedTags.contains(cleanTag)) {
+                        val alreadyExists = selectedTags.any {
+                            it.equals(cleanTag, ignoreCase = true)
+                        }
+
+                        if (cleanTag.isNotBlank() && !alreadyExists) {
                             selectedTags.add(cleanTag)
                             tagInput = ""
                         }
@@ -622,6 +696,77 @@ private fun updateAddressFromCoordinates(
         )
 
     onResult(result)
+}
+
+private fun generateTagsFromImage(
+    context: Context,
+    imageUri: Uri,
+    onTagsDetected: (List<String>) -> Unit,
+    onError: (String) -> Unit
+) {
+    try {
+        val image = InputImage.fromFilePath(context, imageUri)
+
+        val labeler = ImageLabeling.getClient(
+            ImageLabelerOptions.Builder()
+                .setConfidenceThreshold(0.60f)
+                .build()
+        )
+
+        labeler.process(image)
+            .addOnSuccessListener { labels ->
+                val tags = labels
+                    .map { label -> label.text.trim() }
+                    .filter { tag -> tag.isNotBlank() }
+                    .map { tag -> normalizeDetectedTag(tag) }
+                    .distinct()
+                    .take(6)
+
+                Log.d("ImageTags", "Tags détectés : $tags")
+
+                onTagsDetected(tags)
+            }
+            .addOnFailureListener { e ->
+                Log.e("ImageTags", "Erreur analyse image : ${e.message}")
+                onError(e.localizedMessage ?: "Erreur analyse image")
+            }
+    } catch (e: Exception) {
+        Log.e("ImageTags", "Impossible d'analyser l'image : ${e.message}")
+        onError(e.localizedMessage ?: "Impossible d'analyser l'image")
+    }
+}
+
+private fun normalizeDetectedTag(tag: String): String {
+    val clean = tag.trim().lowercase(Locale.getDefault())
+
+    val translations = mapOf(
+        "building" to "bâtiment",
+        "architecture" to "architecture",
+        "landmark" to "monument",
+        "sky" to "ciel",
+        "tree" to "arbre",
+        "plant" to "plante",
+        "flower" to "fleur",
+        "water" to "eau",
+        "beach" to "plage",
+        "mountain" to "montagne",
+        "food" to "nourriture",
+        "restaurant" to "restaurant",
+        "person" to "personne",
+        "people" to "personnes",
+        "selfie" to "selfie",
+        "city" to "ville",
+        "street" to "rue",
+        "car" to "voiture",
+        "vehicle" to "véhicule",
+        "night" to "nuit",
+        "sunset" to "coucher de soleil",
+        "sea" to "mer",
+        "ocean" to "océan",
+        "museum" to "musée"
+    )
+
+    return translations[clean] ?: clean
 }
 
 private fun publishAction(

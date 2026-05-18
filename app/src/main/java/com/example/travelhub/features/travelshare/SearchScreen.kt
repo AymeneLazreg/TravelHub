@@ -79,8 +79,20 @@ fun SearchScreen(viewModel: PostViewModel = viewModel()) {
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
 
-    val categories = listOf("Nature", "Musée", "Rue", "Magasin", "Restaurant")
-
+    val categories = listOf(
+        "Nature",
+        "Musée",
+        "Rue",
+        "Magasin",
+        "Restaurant",
+        "Monument",
+        "Plage",
+        "Parc",
+        "Hôtel",
+        "Café",
+        "Montagne",
+        "Événement"
+    )
     if (showDatePicker) {
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
